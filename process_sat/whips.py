@@ -29,7 +29,7 @@ from process_sat import filetypes
 '''
 VERSION NUMBER
 '''
-__version__ = "2.0.0"
+__version__ = "3.0.2"
 
 class NeedToParseInFileException(Exception):
     '''exception class for signaling the need to parse input file'''
