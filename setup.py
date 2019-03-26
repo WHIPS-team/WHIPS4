@@ -12,7 +12,7 @@ setup(name='WHIPS3',
       packages=['process_sat'],
       scripts=['process_sat/whips.py'],
       url = 'https://nelson.wisc.edu/sage/data-and-models/software.php',
-      download_url='https://github.com/WHIPS-team/WHIPS3/archive/3.0.1.tar.gz',
+      download_url='https://github.com/WHIPS-team/WHIPS3/archive/3.0.2.tar.gz',
       classifiers=[
             'Development Status :: 4 - Beta',
             'Intended Audience :: Science/Research',
