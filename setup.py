@@ -1,18 +1,17 @@
-import os
-
 from setuptools import setup, find_packages
 
 REQUIRES = ['numpy', 'shapely', 'pyproj', 'tables', 'netCDF4', 'pyhdf']
 
 
-with open(os.path.join(os.path.dirname(__file__), 'reST.rst')) as fp:
-    long_description = fp.read()
+def readme():
+    with open('README.rst') as f:
+        return f.read()
 
 setup(name='WHIPS3',
       version='3.0.9',
       install_requires = REQUIRES,
       description='Scripts for customized regridding of Level-2 data to Level-3 data',
-      long_description=long_description,
+      long_description=readme(),
       license = 'MIT License',
       author='Jacob Oberman, Keith Maki, Xiaomeng Jin, Peidong Wang, Elise Penn',
       author_email='taholloway@wisc.edu',
