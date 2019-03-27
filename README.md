@@ -6,7 +6,7 @@ Wisconsin Horizontal Interpolation Program for Satellites provides custom griddi
 PROJECT TITLE: WHIPS
 PURPOSE OF PROJECT: Provide a well-documented, easy-to-use general-purpose
                     processing module for processing satellite data
-VERSION: 3.0.0 (3/26/19)
+VERSION: 3.0.9 (3/26/19)
 AUTHORS: oberman, maki, strom, jin, wang, Penn
 CONTACT: taholloway@wisc.edu; barronh@ufl.edu
 
