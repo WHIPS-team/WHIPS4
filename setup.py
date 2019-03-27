@@ -8,7 +8,7 @@ def readme():
         return f.read()
 
 setup(name='WHIPS3',
-      version='3.0.9',
+      version='3.1.0',
       install_requires = REQUIRES,
       description='Scripts for customized regridding of Level-2 data to Level-3 data',
       long_description=readme(),
