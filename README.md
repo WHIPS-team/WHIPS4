@@ -37,7 +37,7 @@ in the file INSTALL.txt
 
 2. Download whatever data you plan to process.  Currently, the program
 is designed to process OMI NO2 DOMINO level 2 data, OMI NO2 NASA level
-2 data, MOPITT CO data, and MODIS AOD level 2 data.  See the --filelist
+2 data, MOPITT CO data, MODIS AOD level 2 data, and OMI SO2 NSAA level 2 data.  See the --filelist
 argument documentation for more on aquiring data.
 
 
