@@ -22,7 +22,8 @@ equivalent:
 	*Program for Satellites (WHIPS).  WHIPS was developed by Jacob*
 	*Oberman, Erica Scotty, Keith Maki and Tracey Holloway, with* 
 	*funding from the NASA Air Quality Applied Science Team* 
-	*(AQAST) and the Wisconsin Space Grant Consortium Undergraduate*
+	*(AQAST), NASA Health and Air Quality Applied Sciences Team*
+	*(HAQAST) and the Wisconsin Space Grant Consortium Undergraduate*
 	*Award.*
 
 
