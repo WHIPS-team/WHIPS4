@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 REQUIRES = ['numpy', 'shapely', 'pyproj', 'tables', 'netCDF4', 'pyhdf']
 
 
-with open(os.path.join(os.path.dirname(__file__), 'README.md')) as fp:
+with open(os.path.join(os.path.dirname(__file__), 'reST.rst')) as fp:
     long_description = fp.read()
 
 setup(name='WHIPS3',
