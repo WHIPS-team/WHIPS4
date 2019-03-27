@@ -1,3 +1,5 @@
+import os
+
 from setuptools import setup, find_packages
 
 REQUIRES = ['numpy', 'shapely', 'pyproj', 'tables', 'netCDF4', 'pyhdf']
