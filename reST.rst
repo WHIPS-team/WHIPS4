@@ -1,10 +1,10 @@
 ===========
-WHIPS 3.0.2
+WHIPS 3.0.5
 ===========
 
 * **Project Title:** WHIPS
 * **Purpose of Project:** Provide a well-documented, easy-to-use general-purpose processing module for processing satellite data
-* **Version:** 3.0.2 (3/26/19)
+* **Version:** 3.0.5 (3/27/19)
 * **Authors:** oberman, maki, strom, holloway, jin, wang, penn
 * **Contact:** taholloway@wisc.edu
 
@@ -37,7 +37,7 @@ in the file INSTALL.txt
 
 2. Download whatever data you plan to process.  Currently, the program
 is designed to process OMI NO2 DOMINO level 2 data, OMI NO2 NASA level
-2 data, MOPITT CO data, and NASA MODIS AOD level 2 data.  See the 
+2 data, MOPITT CO data, NASA MODIS AOD level 2 data, and OMI SO2 level 2 data.  See the 
 detailed documentation for the --filelist argument for locations of data.
 
 
