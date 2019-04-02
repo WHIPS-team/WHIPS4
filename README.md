@@ -22,8 +22,8 @@ equivalent:
     Program for Satellites (WHIPS).  WHIPS was developed by Jacob
     Oberman and Tracey Holloway, and ongoing development by Barron
     Henderson with funding from the NASA Air Quality Applied Science
-    Team (AQAST) and the Wisconsin Space Grant Consortium 
-    Undergraduate Award.
+    Team (AQAST), NASA Health and Air Quality Applied Sciences Team 
+    (HAQAST) and the Wisconsin Space Grant Consortium Undergraduate Award.
 
 
 QUICK START
@@ -32,7 +32,7 @@ QUICK START
 
 1. Install the program and run the built-in test module to confirm
 that it is working properly.  Installation instructions can be found
-in the file INSTALL.txt
+in the file user_guides/WHIPS_User_Guide_V3.pdf
  
 
 2. Download whatever data you plan to process.  Currently, the program
