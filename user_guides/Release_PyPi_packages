@@ -1,7 +1,8 @@
+
+
 After made modifications in source code files from process_sat
 
 Things to do within GitHub
-
 1. Change setup.py
   Change version number
   Change download_url
@@ -21,6 +22,8 @@ Things to do within GitHub
   Under clone or download, click download zip
   Untar zip file
 
+
+Things to do in terminal window
 5. Publish on PyPi
   In the terminal window, navigate to the package directory (untared in step 4)
   Enter following terminal instructions:
