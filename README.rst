@@ -1,5 +1,5 @@
 ===========
-WHIPS 3.1.0
+WHIPS 3.1.1
 ===========
 
 * **Project Title:** WHIPS
