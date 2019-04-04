@@ -17,13 +17,12 @@ Whenever you publish research or present results generated with WHIPS,
 please include the following acknowledgement or an appropriate
 equivalent:
 
-    We wish to thank the University of Wisconsin--Madison for the 
+    We wish to thank the University of Wisconsin-Madison for the 
     use and development of the Wisconsin Horizontal Interpolation
     Program for Satellites (WHIPS).  WHIPS was developed by Jacob
-    Oberman and Tracey Holloway, and ongoing development by Barron
-    Henderson with funding from the NASA Air Quality Applied Science
-    Team (AQAST), NASA Health and Air Quality Applied Sciences Team 
-    (HAQAST) and the Wisconsin Space Grant Consortium Undergraduate Award.
+    Oberman, Peidon Wang and Tracey Holloway, with funding from the 
+    NASA Air Quality Applied Science Team (AQAST) and NASA Health 
+    and Air Quality Applied Sciences Team (HAQAST).
 
 
 QUICK START
