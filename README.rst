@@ -4,8 +4,8 @@ WHIPS 3.1.1
 
 * **Project Title:** WHIPS
 * **Purpose of Project:** Provide a well-documented, easy-to-use general-purpose processing module for processing satellite data
-* **Version:** 3.1.1 (04/04/19)
-* **Authors:** Jacob Oberman, Peidong Wang, Tracey holloway
+* **Version:** 3.1.1 (04/21/19)
+* **Authors:** Tracey Holloway, Jacob Oberman, Peidong Wang
 * **Contact:** taholloway@wisc.edu
 
 Wisconsin Horizontal Interpolation Program for Satellites (WHIPS)
@@ -19,11 +19,10 @@ equivalent:
 
 	*We wish to thank the University of Wisconsin-Madison for the* 
 	*use and development of the Wisconsin Horizontal Interpolation*
-	*Program for Satellites (WHIPS).  WHIPS was developed by Jacob*
-	*Oberman, Peidong Wang and Tracey Holloway, with* 
-	*funding from the NASA Air Quality Applied Science Team* 
-	*(AQAST) and NASA Health and Air Quality Applied Sciences Team*
-	*(HAQAST).*
+	*Program for Satellites (WHIPS).  WHIPS was developed by Tracey* 
+	*Holloway, Jacob Oberman and Peidong Wang, with funding from* 
+	*the NASA Air Quality Applied Science Team (AQAST) and* 
+	*the NASA Health and Air Quality Applied Sciences Team (HAQAST).*
 
 
 QUICK START
