@@ -72,6 +72,7 @@ import os
 import sys
 import string
 import pdb
+import itertools
 
 import tables
 import numpy
@@ -81,6 +82,7 @@ import pyhdf.VS
 import pyhdf.SD
 
 import filetypes
+import utils
 
 def SupportedFileTypes():
     '''Return a list of supported file types'''
@@ -113,7 +115,7 @@ def getLongName(fPath):
         try:
             node = fid.getNode('/', 'HDFEOS INFORMATION/ArchiveMetadata.0')
         except:
-            node = fid.getNode('/', 'HDFEOS INFORMATION/ArchivedMetadata')
+            node = fid.getNode('/', 'HDFEOS INFORMATION/ArchivedMetadata.0')
     bigString = str(list(node)[0])
     strings = bigString.split('\n')
     for i in range(len(strings)):
@@ -1521,172 +1523,392 @@ class HDFnasaomiv3l2_File(HDFFile):
         protoDtype = [('lat', lat.dtype), ('lon', lon.dtype), ('ind', ind.dtype, 2)]
         struct = numpy.zeros(lat.shape, dtype=protoDtype)
         (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
-
-class HDFnasaomiso2l2_File(HDFFile):
-    """
-    Provide interface to NASA OMI SO2 L2 product, with pixel corners
-    
-    Pixel corners are retrieved from an extra file that must be accessible
-    in cornerDir.  The files listed in cornerFileList, if any, will be checked
-    first, followed by any files in cornerDir. If no valid pixel corner file
-    is found that matches the orbit number of the input file, the parser will
-    instantiage but get_geo_corners will fail with an IOError. 
-
-    The corners retrieved are for the visible channel
-    used by the NO2 algorithm- using this parser for other products may 
-    require altering the parser to use a different channel if 
-    appropriate.
-    """
-    
-    OMIAURASO2_FILE_NAME = "OMI/Aura Sulphur Dioxide (SO2) Total "\
-                           "Column 1-Orbit L2 Swath 13x24km"
-    OMIAURASO2_CORNER_FILE_NAME = "OMI/Aura Global Ground Pixel Corners "\
-                                  "1-Orbit L2 Swath 13x24km"
-
-    def __init__(self, filename, subtype='', extension=None, cornerDir=None,
-                 cornerFileList=None):
-        HDFFile.__init__(self, filename, subtype, extension)
-
-        # make sure filename is actually an input file
-        if getLongName(filename) != HDFnasaomiso2l2_File.OMIAURASO2_FILE_NAME:
-            raise IOError('Attempt to read non-NASA OMI L2 file as such.')
         
-        # start by assuming we aren't going to find anything
-        self.pixCorners = None
+class HDFgome2l2_File(HDF4File):
+    """
+    Provide interface to TEMIS GOME2 level 2 version 2.3 product
+    
+    """
 
-        # see if the corner directory even exists.  If it doesn't, we obviously can't 
-        # find a corner file
-        if os.path.isdir(cornerDir):
+    _indexMap = {'default' : lambda var, ind: var[ind[0]][ind[1],0],
+                 'a_lev' : lambda var, ind: var[0][:,0],
+                 'b_lev' : lambda var, ind: var[0][:,0],
+                 'kernel' : lambda var, ind: var[ind[0]][ind[1],0,:],
+                 'latcorn' : lambda var, ind: var[ind[0]][ind[1],0,:],
+                 'loncorn' : lambda var, ind: var[ind[0]][ind[1],0,:]}
+    
 
-            # convert the corner files into full pathnames
-            # unless we were given null string (signal to search directory)
-            if cornerFileList != ['']:
-                cornerFileList = [os.path.join(cornerDir, f) for f in cornerFileList]
+    # fill values from TEMIS GOME HDF IDL Read Routine Example. Link: 
+    # http://www.temis.nl/airpollution/no2col/papers/read_scia_no2.pro
+    _FVMap =      {'a_lev' : -999,
+                   'b_lev' : -999,
+                   'date' : -999, 
+                   'time' : -999,
+                   'lon' : -999.9,
+                   'lat' : -999.9,
+                   'vcd' : -999.9,
+                   'sigvcd' : -999.9,
+                   'vcdtrop' : -999.9,
+                   'sigvcdt' : -999.9,
+                   'vcdstrat' : - 999.9,
+                   'sigvcds' : -999.9,
+                   'fltrop' :  -999,
+                   'psurf' : -999.9,
+                   'sigvcdak' : -999.9,
+                   'sigvcdtak' : -999.9,
+                   'kernel' : -999,
+                   'ghostcol' : -999.9,
+                   'sza' : -999.9,
+                   'vza' : -999.9,
+                   'raa' : -999.9,
+                   'ssc' : -999,
+                   'loncorn' : -999.,
+                   'latcorn' : -999.,
+                   'scd' : -999.,
+                   'amf' : -999.,
+                   'amftrop' : -999.,
+                   'amfgeo' : -999.,
+                   'scdstr' : -999.,
+                   'clfrac' : -999.,
+                   'cltpress' : -999.,
+                   'albclr' : -999.,
+                   'crfrac' : -999.,
+                   'ltropo' : -999}
 
-            # get orbit number of file for matching
-            forbitnumber = getOrbitNumber(filename)
+    _ScaleOffsetMap =      {'a_lev' : None,
+                   'b_lev' : None,
+                   'date' : None, 
+                   'time' : None,
+                   'lon' : None,
+                   'lat' : None,
+                   'vcd' : None,
+                   'sigvcd' : None,
+                   'vcdtrop' : None,
+                   'sigvcdt' : None,
+                   'vcdstrat' : None,
+                   'sigvcds' : None,
+                   'fltrop' :  None,
+                   'psurf' : None,
+                   'sigvcdak' : None,
+                   'sigvcdtak' : None,
+                   'kernel' : None,
+                   'ghostcol' : None,
+                   'sza' : None,
+                   'vza' : None,
+                   'raa' : None,
+                   'ssc' : None,
+                   'loncorn' : None,
+                   'latcorn' : None,
+                   'scd' : None,
+                   'amf' : None,
+                   'amftrop' : None,
+                   'amfgeo' : None,
+                   'scdstr' : None,
+                   'clfrac' : None,
+                   'cltpress' : None,
+                   'albclr' : None,
+                   'crfrac' : None,
+                   'ltropo' : None}
 
-            # try using the list
+    def getNameExpMap(self, fid, vsInt):
+        """
+        Get a list of names of each Vdata given a prefix and build the 
+        _nameExpMap variable.  
         
-            for f in cornerFileList:
-                if f != '' and getLongName(f) == HDFnasaomiso2l2_File.OMIAURASO2_CORNER_FILE_NAME:
-                    try:
-                        if getOrbitNumber(f) == forbitnumber:
-                            self.pixCorners = f
-                            break
-                    except:
-                        pass
-
-            # if necessary, search entire corner file directory
-            if self.pixCorners == None:        
-                allPossible = [os.path.join(cornerDir, f) for f in os.listdir(cornerDir)]
-                for f in allPossible:
-                    try:
-                        if tables.isHDF5File(f) \
-                                and getLongName(f) == HDFnasaomiso2l2_File.OMIAURASO2_CORNER_FILE_NAME \
-                                and getOrbitNumber(f) == forbitnumber:
-                            self.pixCorners = f
-                            break
-                    except:
-                        pass
+        TEMIS gome2l2 files store each orbit in a separate Vdata table. The 
+        name of each table is a description of the contents of the table 
+        followed by the date and time of the orbit. For example, NO2_ymmddttt, 
+        GEO_ymmddttt, ANC_ymmddttt. 
+        
+        _nameExpMap -   Dictionary.  Keys are field names available to user.
+                        Values are lists of the paths to that field in the HDF 
+                        file. There is one path per orbit. 
+        """
+        
+        # get the names of the Vdatas for each orbit
+        vdataInfo = vsInt.vdatainfo()
+        vdataNames = [i[0] for i in vdataInfo] # get just the names
+        
+        # get a list of all the names of each Vdata
+        # sort them so that each list has the orbits in the same order
+        __PresPath = [x for x in vdataNames if 'pressure_grid' in x]
+        __DataPath = sorted([x for x in vdataNames if 'NO2_' in x])
+        __GeoPath = sorted([x for x in vdataNames if 'GEO_' in x])
+        __AncPath = sorted([x for x in vdataNames if 'ANC_' in x])
                 
-        if self.pixCorners == None:
-            print "No valid corner file found for {0}.".format(filename)                        
-            
-    __dataPath = '/HDFEOS/SWATHS/OMI Total Column Amount SO2/Data Fields/'
-    __geoPath = '/HDFEOS/SWATHS/OMI Total Column Amount SO2/Geolocation Fields/'
-    
-    _nameExpMap = {'AlgorithmFlag_PBL' : __dataPath+'AlgorithmFlag_PBL',
-                   'AlgorithmFlag_STL' : __dataPath+'AlgorithmFlag_STL',
-                   'AlgorithmFlag_TRL' : __dataPath+'AlgorithmFlag_TRL',
-                   'AlgorithmFlag_TRM' : __dataPath+'AlgorithmFlag_TRM',
-                   'ChiSquareLfit' : __dataPath+'ChiSquareLfit',
-                   'CloudPressure' : __dataPath+'CloudPressure',
-                   'ColumnAmountO3' : __dataPath+'ColumnAmountO3',
-                   'ColumnAmountSO2_PBL' : __dataPath+'ColumnAmountSO2_PBL',
-                   'ColumnAmountSO2_PBLbrd' : __dataPath+'ColumnAmountSO2_PBLbrd',
-                   'ColumnAmountSO2_STL' : __dataPath+'ColumnAmountSO2_STL',
-                   'ColumnAmountSO2_STLbrd' : __dataPath+'ColumnAmountSO2_STLbrd',
-                   'ColumnAmountSO2_TRL' : __dataPath+'ColumnAmountSO2_TRL',
-                   'ColumnAmountSO2_TRM' : __dataPath+'ColumnAmountSO2_TRM',
-                   'ColumnAmountSO2_TRMbrd' : __dataPath+'ColumnAmountSO2_TRMbrd',
-                   'LayerEfficiency' : __dataPath+'LayerEfficiency',
-                   'QualityFlags_PBL' : __dataPath+'QualityFlags_PBL',
-                   'QualityFlags_STL' : __dataPath+'QualityFlags_STL',
-                   'QualityFlags_TRL' : __dataPath+'QualityFlags_TRL',
-                   'QualityFlags_TRM' : __dataPath+'QualityFlags_TRM',
-                   'RadiativeCloudFraction' : __dataPath+'RadiativeCloudFraction',
-                   'Reflectivity331' : __dataPath+'Reflectivity331',
-                   'Residual' : __dataPath+'Residual',
-                   'ResidualAdjustment' : __dataPath+'ResidualAdjustment',
-                   'Rlambda1st' : __dataPath+'Rlambda1st',
-                   'Rlambda2nd' : __dataPath+'Rlambda2nd',
-                   'SO2indexP1' : __dataPath+'SO2indexP1',
-                   'SO2indexP2' : __dataPath+'SO2indexP2',
-                   'SO2indexP3' : __dataPath+'SO2indexP3',
-                   'TerrainPressure' : __dataPath+'TerrainPressure',
-                   'UVAerosolIndex' : __dataPath+'UVAerosolIndex',
-                   'Wavelength' : __dataPath+'Wavelength',
-                   'dN_dSO2_STL' : __dataPath+'dN_dSO2_STL',
-                   'dN_dSO2_TRL' : __dataPath+'dN_dSO2_TRL',
-                   'dN_dSO2_TRM' : __dataPath+'dN_dSO2_TRM',
-                   'deltaO3' : __dataPath+'deltaO3',
-                   'deltaRefl' : __dataPath+'deltaRefl',
-                   'fc' : __dataPath+'fc',
-                   'GroundPixelQualityFlags' : __geoPath+'GroundPixelQualityFlags',
-                   'Latitude' : __geoPath+'Latitude',
-                   'Longitude' : __geoPath+'Longitude',
-                   'RelativeAzimuthAngle' : __geoPath+'RelativeAzimuthAngle',
-                   'SecondsInDay' : __geoPath+'SecondsInDay',
-                   'SolarAzimuthAngle' : __geoPath+'SolarAzimuthAngle',
-                   'SolarZenithAngle' : __geoPath+'SolarZenithAngle',
-                   'SpacecraftAltitude' : __geoPath+'SpacecraftAltitude',
-                   'SpacecraftLatitude' : __geoPath+'SpacecraftLatitude',
-                   'SpacecraftLongitude' : __geoPath+'SpacecraftLongitude',
-                   'TerrainHeight' : __geoPath+'TerrainHeight',
-                   'Time' : __geoPath+'Time',
-                   'ViewingAzimuthAngle' : __geoPath+'ViewingAzimuthAngle',
-                   'ViewingZenithAngle' : __geoPath+'ViewingZenithAngle',
-                   'nTimes_idx' : __geoPath+'nTimes_idx',
-                   'nXtrack_idx' : __geoPath+'nXtrack_idx',
-                   'FoV75CornerLatitude' :__geoPath+'FoV75CornerLatitude',
-                   'FoV75CornerLongitude' :__geoPath+'FoV75CornerLongitude'}
-
-    _indexMap = {'default' : lambda var, ind: var[ind[0], ind[1], ...],
-    	          'Time' : lambda var, ind: var[ind[0]]}
-                  	    
-    def get_geo_corners(self):
-        '''
-        Retrieves array of the corners of the pixels.  
+        # make sure orbit numbers match (purely because this makes me nervous, 
+        # not because this should ever happen)
+        dataOrbit = [vName[4:] for vName in __DataPath]
+        geoOrbit = [vName[4:] for vName in __GeoPath]
+        ancOrbit = [vName[4:] for vName in __AncPath]
         
-        Throws IOError if no pixel corner file specified
-        '''
-        latNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLatitude'
-        lonNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLongitude'
-        try:
-            pxFid = tables.openFile(self.pixCorners)
-        except AttributeError:
-            raise IOError('Unable to open pixel corners file.  Need pixel corners file to use corners')
-        try:
-            latNode = pxFid.getNode('/', latNodeName)
-            lonNode = pxFid.getNode('/', lonNodeName)
-            # Note: it is assumed that there are no missing values.
-            lat = latNode[:].transpose((1,2,0))
-            lon = lonNode[:].transpose((1,2,0))            
-        finally:
-            pxFid.close()
-        ind = numpy.indices(lat.shape[0:2]).transpose((1,2,0))
-        protoDtype = [('lat', lat.dtype, 4), ('lon', lon.dtype, 4), ('ind', ind.dtype, 2)]
-        struct = numpy.zeros(lat.shape[0:2], dtype=protoDtype)
-        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
-        return struct
+        if dataOrbit != geoOrbit or dataOrbit != ancOrbit:
+            raise Exception('Orbits numbers do not match. This GOME-2 file is broken.')
+        
+        _nameExpMap = {'a_lev' : __PresPath,
+               'b_lev' : __PresPath,
+               'date' : __DataPath, 
+               'time' : __DataPath,
+               'lon' : __DataPath,
+               'lat' : __DataPath,
+               'vcd' : __DataPath,
+               'sigvcd' : __DataPath,
+               'vcdtrop' : __DataPath,
+               'sigvcdt' : __DataPath,
+               'vcdstrat' : __DataPath,
+               'sigvcds' : __DataPath,
+               'fltrop' :  __DataPath,
+               'psurf' : __DataPath,
+               'sigvcdak' : __DataPath,
+               'sigvcdtak' : __DataPath,
+               'kernel' : __DataPath,
+               'ghostcol' : __DataPath, # Documentation online is wrong. 
+               'sza' : __GeoPath,       # ghostcol is in __DataPath, not
+               'vza' : __GeoPath,       # __GeoPath.
+               'raa' : __GeoPath,
+               'ssc' : __GeoPath,
+               'loncorn' : __GeoPath,
+               'latcorn' : __GeoPath,
+               'scd' : __AncPath,
+               'amf' : __AncPath,
+               'amftrop' : __AncPath,
+               'amfgeo' : __AncPath,
+               'scdstr' : __AncPath,
+               'clfrac' : __AncPath,
+               'cltpress' : __AncPath,
+               'albclr' : __AncPath,
+               'crfrac' : __AncPath,
+               'ltropo' : __AncPath} 
+        
+        return _nameExpMap
     
+    
+    def get(self, key, indices=None, missingValue=None):
+        """
+        Provide get functionality for GOME-2 HDF 4 files.  
+
+        Assumes absolutely no attributes present.
+
+        If missingValue is provided, it will be used to mask floating
+        point data properly with NaN's.  If it is not provided, the value in 
+        _FVMap corresponding to the key will be used. If the key is not in 
+        _FVMap, data will be returned as is, -9999.0's and all (but this 
+        function is unlikely to work at all in that case).
+        
+        Calls getNameExpMap to build the _nameExpMap dictionary. 
+
+        Requires that parser be set up with _indexMap 
+        variable.  This must be defined as:
+                       
+        _indexMap -     Dictionary.  Keys are field names available to user.  
+                        Values are functions that when passed (var, ind) where
+                        ind is a n-element tuple will return the proper slice.
+                        n is the number of fundamental dimensions of the 
+                        file type.
+        """        
+        fid = pyhdf.HDF.HDF(self.name)
+        vsInt = fid.vstart()
+        _nameExpMap = self.getNameExpMap(fid,vsInt)
+        vData = numpy.empty(len(_nameExpMap[key]),dtype=object)
+        
+        try:
+            # read variable from each orbit Vdata and append them into one list
+            nOrbit = 0 # each Vdata represents one orbit
+            for path in _nameExpMap[key]:
+                vNode = vsInt.attach(path)
+                vNode.setfields(key)
+                vData[nOrbit] = numpy.array(vNode[:]) 
+                # close your Vdata
+                try:
+                    vNode.detach()
+                except(NameError):
+                    pass
+                nOrbit = nOrbit + 1
+        except AttributeError as err:
+            raise IOError("No field %s.  May be attempt to read non-GOME-2 file as such." % self._nameExpMap[key])
+        except KeyError:
+            raise IOError("Attempt to use fieldname not associated with this filetype.")
+        finally:
+            # close the interface
+            try:
+                vsInt.end()
+            except(NameError):
+                pass
+
+            fid.close
+
+                
+        # get missingValue from _FVMap if it is not provided
+        if not missingValue:
+            missingValue = self._FVMap.get(key,None) 
+        
+        # convert missing values if appropriate
+        #for k in vData.keys():
+        if missingValue and vData.dtype in ['float32', 'float64', 'int16']:
+            vData = numpy.where(vData == missingValue, numpy.NaN, vData)
+
+        # use indices if we have them
+        if indices is not None:
+            # we want specific indices, use _indexMap
+            indFunc = self._indexMap.get(key, self._indexMap['default'])
+            return indFunc(vData, indices)
+        else:
+            # just fetch everything
+            return vData
+
+    def get_cm(self, key, indices=None, missingValue=None):
+        """
+        Provide get_cm function for HDF files
+
+        get_cm works the same as get, but relies on a context manager to speed
+        up access by allowing it safely leave open variables in memory.
+
+        Assumes absolutely no attributes present.
+
+        If missingValue is provided, it will be used to mask floating
+        point data properly with NaN's.  If it is not provided, the value in 
+        _FVMap corresponding to the key will be used. If the key is not in 
+        _FVMap, data will be returned as is, -9999.0's and all (but this 
+        function is unlikely to work at all in that case).
+
+        Requires that parser be set up with _nameExpMap and _indexMap 
+        variables.  These must be defined as:
+        
+        _nameExpMap -   Dictionary.  Keys are field names available to user.
+                        Values are the full path to that field in the HDF file.
+                       
+        _indexMap -     Dictionary.  Keys are field names available to user.  
+                        Values are functions that when passed (var, ind) where
+                        ind is a n-element tuple will return the proper slice.
+                        n is the number of fundamental dimensions of the 
+                        file type.
+        """
+        
+        # open the variable if it isn't open already.
+        if key not in self._open_vars.keys():
+            _nameExpMap = self.getNameExpMap(self._fid,self._vsInt)
+            vData = numpy.empty(len(_nameExpMap[key]),dtype=object)
+            try:
+                # read variable from each orbit Vdata and append them into one list
+                nOrbit = 0 # each Vdata generally represents one orbit 
+                for path in _nameExpMap[key]:
+                    vNode = self._vsInt.attach(path)
+                    vNode.setfields(key)
+                    vData[nOrbit] = numpy.array(vNode[:]) 
+                    # close your Vdata
+                    try:
+                        vNode.detach()
+                    except(NameError):
+                        pass
+                    nOrbit = nOrbit + 1
+                # store in _open_vars for fast access later
+                self._open_vars[key] = vData
+            except AttributeError:
+                raise IOError("No field %s.  May be attempt to read non-GOME-2 file as such." % self._nameExpMap[key])
+            except KeyError:
+                raise IOError("Attempt to use fieldname %s, which is not associated with this filetype." % key)
+                
+            # get missingValue from _FVMap if it is not provided
+            if not missingValue:
+                missingValue = self._FVMap.get(key,None) 
+                
+            # convert missing values if appropriate
+            if missingValue and self._open_vars[key].dtype in ['float32', 'float64', 'int16']:
+                self._open_vars[key] = numpy.where(self._open_vars[key] == 
+                               missingValue, numpy.NaN, self._open_vars[key])
+                
+
+        # retrieve value of interest from the (newly?) open variable
+        if indices is not None:
+            # we want specific indices, use _indexMap
+            indFunc = self._indexMap.get(key, self._indexMap['default'])
+            return indFunc(self._open_vars[key], indices)
+        else:
+            # just fetch everything
+            return self._open_vars[key]
+        
     def get_geo_centers(self):
-        lat = self.get('Latitude')
-        lon = self.get('Longitude')
-        ind = numpy.indices(lat.shape).transpose((1,2,0))
-        protoDtype = [('lat', lat.dtype), ('lon', lon.dtype), ('ind', ind.dtype, 2)]
+        """
+        get_geo_centers() - returns a record array with 3 fields.  The
+                    first field, lat, contains the latitude of
+                    the pixel center.  The lon field contains
+                    the longitude of the pixel center.  The
+                    field ind is as alarge as it needs to be
+                    to contain the indices.  If cast to a 
+                    tuple and fed into the get() function,
+                    it should retrieve the same pixel. Although the 
+                    GOME-2 files store lons on the range [0, 360), 
+                    all lons from get_geo_centers() are returned on the 
+                    range (-180, 180]. In contrast, get('lon') returns a
+                    value on [0, 360) for GOME-2 files.
+        """
+        lat2d = self.get('lat')
+        lon2d = self.get('lon')
+        
+        # flatten the lists
+        lat = numpy.array(list(itertools.chain.from_iterable(lat2d))).squeeze()
+        lon360 = numpy.array(
+                list(itertools.chain.from_iterable(lon2d))).squeeze()
+        
+        # flip lons from [0, 360) to (-180, 180]
+        lon_flip = numpy.vectorize(utils.wrap_lon_neg180_180)
+        lon = lon_flip(lon360)
+        
+        # create indices
+        iList = numpy.array([],dtype=int)
+        jList = numpy.array([],dtype=int)
+        for i in range(lat2d.size):
+            jLength = lat2d[i].size
+            iList = numpy.append(iList,[i]*jLength)     # orbits
+            jList = numpy.append(jList,range(jLength))  # records
+        ind = numpy.array(list(itertools.izip(iList,jList)))
+        
+        protoDtype = [('lat', lat.dtype), ('lon', lon.dtype), \
+                              ('ind', ind.dtype, 2)]
         struct = numpy.zeros(lat.shape, dtype=protoDtype)
         (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
         return struct
 
+    def get_geo_corners(self):
+        """    
+        get_geo_corners() - returns a record array with three fields.
+                    The first field, lat, contains 4 floats, 
+                    the latitudes of the 4 corners.  The field
+                    lon contains 4 floats, the longitudes of 
+                    the 4 corners.  The field ind is as 
+                    large as it needs to be to contain the 
+                    indices.  each ind should be castable
+                    to a tuple that can be fed into the get() function to
+                    retrieve the same pixel. Although the GOME-2 files 
+                    store lons on the range [0, 360), all lons from 
+                    get_geo_corners() are returned on the range (-180, 180]. 
+                    In contrast, get('lon') returns a value on [0, 360) for 
+                    GOME-2 files.
+        """
+        lat2d = self.get('latcorn')
+        lon2d = self.get('loncorn')
+        
+        # flatten the lists
+        lat = numpy.array(list(itertools.chain.from_iterable(lat2d))).squeeze()
+        lon360 = numpy.array(
+                list(itertools.chain.from_iterable(lon2d))).squeeze()
+        
+        # flip lons from [0, 360) to (-180, 180]
+        # vectorize allows us to apply this function to an array elementwise
+        lon_flip = numpy.vectorize(utils.wrap_lon_neg180_180) 
+        lon = lon_flip(lon360)
+        
+        
+        # create indices
+        iList = numpy.array([],dtype=int)
+        jList = numpy.array([],dtype=int)
+        for i in range(lat2d.size):
+            jLength = lat2d[i].shape[0]
+            iList = numpy.append(iList,[i]*jLength)     # orbits
+            jList = numpy.append(jList,range(jLength))  # records
+        ind = numpy.array(list(itertools.izip(iList,jList)))
+
+        protoDtype = [('lat', lat.dtype, 4), ('lon', lon.dtype, 4), ('ind', ind.dtype, 2)]
+        struct = numpy.zeros(lat.shape[0], dtype=protoDtype)
+        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
+        return struct

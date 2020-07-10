@@ -1,4 +1,5 @@
-#! /Library/Frameworks/Python.framework/Versions/Current/bin/python
+#! /Users/Elise/miniconda2/envs/whipstest/bin/python
+####! /Library/Frameworks/Python.framework/Versions/Current/bin/python
 '''
 New command-line io for oberman's process scripts
 
@@ -7,8 +8,8 @@ Process a series of files, generating some kind of output for each
 If verbose is set to True, all default status updates will be printed.  
 If set to False, the program will run silently
 
-@version 03/26/2019
-@author: maki, oberman, jin, wang, penn
+@version 11/21/2014
+@author: maki, oberman
 '''
 import os
 import sys
@@ -29,7 +30,7 @@ from process_sat import filetypes
 '''
 VERSION NUMBER
 '''
-__version__ = "3.0.2"
+__version__ = "2.0.0"
 
 class NeedToParseInFileException(Exception):
     '''exception class for signaling the need to parse input file'''

@@ -37,7 +37,6 @@ import datetime
 import warnings
 import pdb
 
-
 import numpy
 import netCDF4
 
@@ -70,6 +69,32 @@ def _OMNO2e_formula(cloudFrac, fieldOfView):
     capE = pow(10,-16)*(18.5+2.8*pow(10,-4)*pow(abs(fieldOfView-29.7), 3.5))
     return pow((eps*capE), -2)
 
+def _convert_GOME2_time_to_TAI93(date, time):
+    '''Converts GOME-2 date and time to TAI93 (seconds since 1 Jan 1993). 
+    Time and date are stored as unpadded floats and integers, respectively. 
+    As a result, this function is required to convert to TAI93. Note that 
+    the TEMIS documentation contains an error which states they are stored as 
+    8-character bits. 
+    
+    Inputs:
+        date - an integer in form yyyymmdd. 
+        time - a float in form hhmmss.f, where f is a decimal fraction of a 
+                second. Because it is a float, this is not padded. 
+    Outputs: 
+        float - seconds since 1 January 1993
+    '''
+    dateStr = str(date) # form: yyyymmdd
+    timeStr = str(int(numpy.trunc(float(time)))).zfill(6) # form: hhmmss
+    timeFrac = float(time) - float(timeStr) # decimal fraction of seconds
+    
+    # convert yyyymmdd-hhmmss to TAI93
+    epoch = '19930101000000'
+    frmat = '%Y%m%d%H%M%S'
+    timeInSecs = utils.timestr_to_nsecs(dateStr+timeStr,epoch,frmat)\
+                    + float(timeFrac) # add the fraction of a 
+                                      # second back
+    return timeInSecs
+
 class invalidPixCeption(Exception):
     pass
     
@@ -84,151 +109,6 @@ def boolCaster(boolStr):
     else:
         msg = 'Attempt to cast invalid string %s to boolean' % boolStr
         raise TypeError(msg)
-
-# currently borked.  No immediate plans to fix
-#class OMNO2e_wght_avg_out_func(out_func):
-class OMNO2e_wght_avg_BORKED(out_func): 
-    '''
-    Weighted avg based on OMNO2e algorithm
-
-    Note: this algorithm doesn't note what to do when the weight for a term is
-    nonzero, but the term itself contains a fillValue.  This assumption
-    is checked by an assert statement in the code, so it won't be checked
-    if optimization is requested
-    
-    OMNO2e algorithm and theoretical basis laid out
-    at <http://disc.sci.gsfc.nasa.gov/Aura/data-holdings/OMI/omno2e_v003.shtml>
-    
-    Set up to work specifically for OMI instruments.
-    
-    parameters dict must contain keys:
-        toAvg
-        overallQualFlag
-        cloudFrac
-        solarZenithAngle
-        cloudFractUpperCutoff
-        solarZenAngUpperCutoff
-        pixIndXtrackAxis
-        fillVal
-    
-    writes out a single file of name outfilename
-    when called.  That file is an ASCII representation
-    weighted averages for each gridcell.  It is a csv 
-    file with all numbers in e-format scientific 
-    notation.  Cells without valid measurements contain the fillvalue.
-    '''  
-    @staticmethod
-    def parm_list():
-        return ['toAvg', 'overallQualFlag', 'cloudFrac', 
-                'solarZenithAngle', 'cloudFractUpperCutoff',
-                'pixIndXtrackAxis', 'fillVal']
-
-    @staticmethod
-    def required_parms():
-        return {'toAvg' : ('The name of the field to be averaged',None),
-                'overallQualFlag' : ('The name of the field containing' \
-                                     ' the overall quality flag for the' \
-                                     ' pixels.  This flag should be true' \
-                                     ' (1) for invalid pixels and false' \
-                                     ' (0) for valid pixels.\n{ OMI KNMI' \
-                                     ' - TroposphericColumnFlag\n  OMI NASA' \
-                                     ' - vcdQualityFlags }',None),
-                'cloudFrac' : ('The name of the field containing the ' \
-                               'cloud fractions.\n{ OMI KNMI - CloudFraction' \
-                               '\n  OMI NASA - CloudFraction }',None),
-                'solarZenithAngle' : ('The name of the field containing the ' \
-                                      'solar zenith angles in degrees.\n{ ' \
-                                      'OMI KNMI - SolarZenithAngle\n  OMI' \
-                                      ' NASA - SolarZenithAngle }',None),
-                'cloudFractUpperCutoff' : ('The maximum cloud fraction to ' \
-                                           'allow before excluding pixel ' \
-                                           'from average.  Suggested value ' \
-                                           'from NASA is 0.3','decimal'),
-                'solarZenAngUpperCutoff' : ('The maximum solar zenith angle ' \
-                                            'to allow before excluding pixel ' \
-                                            'from average.  Suggested value ' \
-                                            'from NASA is 85.  Must be in ' \
-                                            'degrees.','decimal'),
-                'pixIndXtrackAxis' : ('The dimension order (0 based) of the ' \
-                                      'of the "cross-track" dimension (which' \
-                                      'ever dimension has size 60).  For all' \
-                                      ' currently known cases should be 1 ' \
-                                      ' (may change in future versions of ' \
-                                      'OMI products).','int'),
-                'fillVal' : ('The value to use as a fill value in the output ' \
-                             'netCDF file.  This value will replace any missing '\
-                             ' or invalid output values','decimal')}
-    
-    # userKeys not necessary, so 'filler' field used instead
-    __userKeys__ = "filetype"
-
-    def __call__(self, maps, griddef, outfilename, verbose, version):
-
-        # function is broken until it can be refactored such that
-        # _OMNO2e_func doesn't require totFlag.  Needs to have pixel
-        # loop to check each 
-        BORKED = 2
-        print('THIS FUNCTION IS BORKED.  ABORT! ABORT! ABORT!')
-        sys.exit(BORKED)
-
-        # even though IO interface handles casting already
-        # a catchblock has been added here for safety
-        # in case someone wants to use this class directly
-        castDict = {'toAvg':str, 'overallQualFlag':str,
-                    'cloudFrac':str, 'solarZenithAngle':str,
-                    'cloudFractUpperCutoff':float, 
-                    'solarZenAngUpperCutoff':float,
-                    'pixIndXtrackAxis':int, 'fillVal':float}
-        for (k,func) in castDict.items():
-            self.parmDict[k] = func(self.parmDict[k])
-
-        '''Write out single weighted-avg file'''
-        numpy.seterr(over='raise')
-        nRows = griddef.indLims()[1] - griddef.indLims()[0] + 1
-        nCols = griddef.indLims()[3] - griddef.indLims()[2] + 1
-        sum_weights = numpy.zeros((nRows, nCols))
-        sum_weighted_vals = numpy.zeros((nRows, nCols))
-        if not isinstance(maps, list):
-            maps = [maps] # create list if we didn't get one
-        for map in maps:
-            with map.pop('parser') as p: # pop out so we can loop
-                if verbose:
-                    print('Processing {0} for output at {1}.'.format(\
-                            p.name, str(datetime.datetime.now())))
-                for (k,v) in map.iteritems():
-                    sumFlag = numpy.array([p.get_cm(self.parmDict['overallQualFlag'], pxind)
-                                            for (pxind, unused_weight) in v])
-                    sumFlag = numpy.mod(sumFlag, 2)
-                    cFrac = numpy.array([p.get_cm(self.parmDict['cloudFrac'], pxind)
-                                          for (pxind, unused_weight) in v])
-                    cFracFlag = cFrac > self.parmDict['cloudFractUpperCutoff']
-                    solZen = numpy.array([p.get_cm(self.parmDict['solarZenithAngle'], pxind)
-                                          for (pxind, unused_weight) in v])
-                    solZenFlag = solZen > self.parmDict['solarZenAngUpperCutoff']
-                    totFlag = numpy.logical_or(numpy.logical_or(sumFlag, cFracFlag), solZenFlag)
-                    fov = numpy.array([pxind[self.parmDict['pixIndXtrackAxis']]
-                                        for (pxind, unused_weight) in v])
-                    toAvg = numpy.array([p.get_cm(self.parmDict['toAvg'], pxind)
-                                          for (pxind, unused_weight) in v])
-                    # BORKED
-                    weights = 0
-                    #   weights = _OMNO2e_formula(cFrac, fov)
-                    assert ~any(numpy.logical_and(~numpy.isnan(weights), numpy.isnan(toAvg)))
-                    sumWeight = numpy.nansum(weights)
-                    sumWeightVals = numpy.nansum(toAvg*weights)
-                    # only add if we had some element (otherwise we fill
-                    # sum_weights with nans)
-                    if ~numpy.isnan(sumWeight) and ~numpy.isnan(sumWeightVals): 
-                        sum_weights[k] += sumWeight
-                        sum_weighted_vals[k] += sumWeightVals
-                map['parser'] = p  # return parser to map
-        oldsettings = numpy.seterr(divide='ignore')  # ignore any div by zero errors
-        avgs = numpy.where(sum_weights != 0, 
-                           numpy.divide(sum_weighted_vals, sum_weights), 
-                           self.parmDict['fillVal'])
-        numpy.seterr(divide=oldsettings['divide'])  # reset to default
-        numpy.savetxt(outfilename, avgs, delimiter=',', fmt='%7e')
-        return avgs
 
 class OMNO2e_netCDF_avg_out_func(out_func):
     '''
@@ -2559,22 +2439,452 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
         if self.parmDict['includePixelCount']:
             outAvg['ValidPixelCount'] = nValidPixels
         return outAvg
-
-class OMISO2_netCDF_avg_out_func(out_func):
+    
+    
+class OMNO2d_GOME2_netCDF_avg_out_func(out_func):
     '''
     Weighted average for a given set of filtered values
-    based on OMNO2e algorithm.
+    based on OMNO2d algorithm.
     
     Assumptions:
         - this algorithm assumes that fields to be averaged will have,
         at most, 1 extra dimension.  If not, an assertion error is raised.
         - this algorithm is undefined for cases where the weight of a term
         is nonzero, but the term contains a fillValue.  If this condition
-        is met, unexpected results may occur.  This assumption is NOT checked
-        - The timestamp of the file is assumed to be in the TAI93 standard.
+        is met, unexpected results may occur.  This assumption is NOT checked. 
     
-    OMNO2e algorithm and theoretical basis laid out
-    at <http://disc.sci.gsfc.nasa.gov/Aura/data-holdings/OMI/omno2e_v003.shtml>
+    OMNO2d algorithm and theoretical basis laid out
+    at <https://acdisc.gesdisc.eosdis.nasa.gov/data/Aura_OMI_Level3/OMNO2d.003/doc/README.OMNO2.pdf>
+    
+    Set up to work specifically for GOME-2 instruments.
+
+    parameters dict must contain keys:
+        overallQualFlag:
+            Flag used as overall quality.  Assumed that
+            when this flag is set, the data is BAD and 
+            the pixel is ignored
+        cloudFrac:
+            field with cloud fraction (0 to 1).  When this
+            field is GREATER than the cutoff value the
+            pixel is ignored.
+        solarZenithAngle: 
+            Field with solar zenith angle (in degrees). 
+            When this field is GREATER than the cutoff
+            value the pixel is ignored.
+        date: 
+            Field with the date for each pixel. 
+            Assumed to be in format: yyyymmdd.  When the 
+            combined time and date are less than the 
+            timeStart parameter or greater than the 
+            timeStop parameter, the pixel is ignored.
+        time:
+            Field with the time for each pixel. 
+            Assumed to be in format: hhmmsshu.  When the 
+            combined time and date are less than the 
+            timeStart parameter or greater than the 
+            timeStop parameter, the pixel is ignored.
+        longitude:
+            Field with the longitudes at cell centers.
+            Used to estimate timezones of the pixels if
+            'local' is selected for timeComparison.  Not
+            used when timeComparison is 'UTC'
+        inFieldNames:
+            List of fields to process.  Each of these
+            is output as a separate variable in the 
+            netcdf output file.
+        outFieldNames:
+            List of desired output names.  Must be of the
+            same length and co-indexed to the list above.
+            These will be the actual variable names in
+            the netcdf file.
+        outUnits:
+            List of string labels for the units of each
+            output quantity.  Must be of the same length
+            and co-indexed to the lists above.
+        extraDimLabel: 
+            List of the labels for the above extra 
+            dimensions.  1 per variable.  Only used if the
+            coindexed field has an extra dim. Must be of the
+            same length and co-indexed to the lists above.
+        extraDimSize:
+            List of the sizes of the above extra dimensions.
+            1 per variable.  If the coindexed field does not
+            have an extra dim, put in 0 or 1.  Must be
+            of the same length and co-indexed to the lists 
+            above.
+        timeComparison:
+            Determines how the timeStart and timeStop 
+            arguments are interpreted.  If the user selects
+            'local', these arguments are interpreted as local
+            times.  Only those pixels whose timestamps 
+            indicate they lie in the desired span in local
+            time will be included.  Daylight savings time
+            is not considered and time zone calculations are
+            only approximate.  If the users selects 'UTC'
+            a straight comparison is done between the pixel
+            timestamp and the timeStart and timeStop 
+            arguments to see if the pixel is valid.
+        timeStart:
+            Initial time we want included in file.  
+            Times must be in TAI93 standard format.
+            *format hh:mm:ss_MM-DD-YYYY will also be converted automatically.
+        timeStop:
+            Final Time we want in included in file.
+            Times must be in TAI93 standard format.
+            *format hh:mm:ss_MM-DD-YYYY will also be converted automatically.
+        cloudFractUpperCutoff:
+            Pixels with a higher cloud fraction than this 
+            value will be ignored.
+        solarZenAngUpperCutoff:
+            Pixels with a higher solar zenith angle than
+            this value will be ignored.
+        fillVal:
+            The value we want to use to denote missing data
+            in the output file.  This will be documented
+            within the output file itself.
+        includePixelCount:
+            If this parameter is True, WHIPS will include a field
+            'ValidPixelCount' in the output file that will include
+            the number of valid pixels for each grid cell.
+
+    Outputs a netcdf file with name determined by outFileName
+    parameter.  This netcdf file contains as many variables
+    as there are inFieldNames passed.  Each variable
+    is output as an average over the range of values
+    where it was valid acccording to the averaging
+    scheme dedfined in the NASA document linked above.
+    '''
+    @staticmethod
+    def parm_list():
+        return ['overallQualFlag', 'cloudFrac', 'solarZenithAngle',
+                'date', 'time', 'longitude', 'inFieldNames', 'outFieldNames',
+                'outUnits', 'extraDimLabel', 'extraDimSize',
+                'timeComparison', 'timeStart', 'timeStop',
+                'cloudFractUpperCutoff', 'solarZenAngUpperCutoff',
+                'fillVal', 'includePixelCount']
+    @staticmethod
+    def required_parms():
+        return {'overallQualFlag' : ('The name of the field containing ' \
+                                     'the overall quality flag for the ' \
+                                     'pixels.  This flag should be true (1) ' \
+                                     'for invalid pixels and false (0) for ' \
+                                     'valid pixels.\n{ GOME-2 - fltrop }',\
+                                     None),
+                'cloudFrac' : ('The name of the field containing the ' \
+                               'cloud fractions\n{ GOME-2 - clfrac }',None),
+                'solarZenithAngle' : ('The name of the field containing the '\
+                                      'solar zenith angles in degrees.\n{ ' \
+                                      'GOME-2 - sza }',None),
+                'date' : ('The name of the field containing the date. '\
+                          ' Dates are assumed to be in the yyyymmdd ' \
+                          'format.\n{ GOME-2 - date }', \
+                          None),
+                'time' : ('The name of the field containing the time. '\
+                          ' Times are assumed to be unpadded float in the '\
+                          'hhmmss.f format.\n{ GOME-2 - time }', \
+                          None),
+                'longitude' : ('The name of the field containing longitudes ' \
+                               'at cell centers.  Longitudes should be in ' \
+                               'degrees east.\n{ GOME-2 - lon }',None),
+                'inFieldNames' : ('The names of the fields desired to be ' \
+                                  'output.  Input as comma-delimited list ', \
+                                  'list'),
+                'outFieldNames' : ('The names of the output variables (even ' \
+                                   'if they are to be the same as the input ' \
+                                   'variables).  Should be a comma-delimited ' \
+                                   'list co-indexed to inFieldNames','list'),
+                'outUnits' : ('The units of the variables to be written out. ' \
+                              'Should be a comma-delimited list co-indexed ' \
+                              'to inFieldNames','list'),
+                'extraDimLabel' : ('The label for the extra dimension '  \
+                                   '(should the variable have an extra ' \
+                                   'dimension).  Ignored in the case of a ' \
+                                   '2D variable.  Should be a comma-delimited '\
+                                   'list co-indexed to inFieldNames','list'),
+                'extraDimSize' : ('The size of the extra dimensions (should ' \
+                                  'the variable have an extra dimension).  ' \
+                                  'For 2D variables, must be set to 0. (zero)' \
+                                  '  Should be a comma-delimited list ' \
+                                  'co-indexed to inFieldNames.','list'),
+                'timeComparison' : ('Must be set to either "local" or "UTC". ' \
+                                    ' Determines how the file timestamps are ' \
+                                    'compared to the start/stop time.  If set '\
+                                    'to "local", then the file timestamps are '\
+                                    'converted to local time on a pixel-by-'\
+                                    'pixel basis (using longitude to estimate '\
+                                    'time zone) before being compared to time '\
+                                    'boundaries.  If set to "UTC" the file ' \
+                                    'timestamps (which are assumed to be in ' \
+                                    'UTC) are compared against the start/stop '\
+                                    'time directly.',None),
+                'timeStart' : ('The earliest time for which data should be ' \
+                               'recorded into the output file.  All times in ' \
+                               'input files before this time will be filtered '\
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'timeStop' : ('The latest time for which data should be ' \
+                               'recorded into the output files.  All times in '\
+                               'input files after this time will be filtered ' \
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'cloudFractUpperCutoff' : ('The maximum cloud fraction to ' \
+                                           'allow before excluding pixel from '\
+                                           'average.  Suggested value from ' \
+                                           'NASA is 0.3','decimal'),
+                'solarZenAngUpperCutoff' : ('The maximum solar zenith angle to'\
+                                            ' allow before excluding pixel ' \
+                                            'from average, in degrees.  ' \
+                                            'Suggested value from NASA is 85.',\
+                                            'int'),
+                'fillVal' : ('The value to use as a fill value in the output ' \
+                             'netCDF file.  This value will replace any missing '\
+                             'or invalid output values','decimal'), 
+                'includePixelCount' : ('If set to true, the output will include '\
+                                       'a field "ValidPixelCount" that contains '\
+                                       'the number of valid pixels in each grid '\
+                                       'cell.  Only pixels with nonzero weight  '\
+                                       'are considered valid.', 'bool')}
+    # variable signifying which list is to act as the master list index
+    __userKeys__ = "inFieldNames"
+
+    def __call__(self, maps, griddef, outfilename, verbose, version):
+        '''Write out a weighted-average file in netcdf format.'''
+        #Make sure non-string parameters are in the correct format
+        dimsizes = self.parmDict['extraDimSize']
+        for i in range(len(dimsizes)):
+            try:
+                dimsizes[i] = int(dimsizes[i])
+            except ValueError:
+                print ("Warning: {0} is not a valid extraDimSize value.  " \
+                      "Using 0 instead").format(dimsizes[i])
+                dimsizes[i] = 0
+                continue
+        self.parmDict['extraDimSize'] = dimsizes
+
+        # even though IO interface handles casting already,
+        # a catchblock has been added here for safety
+        # in case someone wants to use this class directly
+        castDict = {'overallQualFlag':str, 'cloudFrac':str,
+                    'solarZenithAngle':str, 'date':str, 'time':str,
+                    'longitude':str, 'inFieldNames':list,
+                    'outFieldNames':list, 'outUnits':list,
+                    'extraDimLabel':list, 'extraDimSize':list,
+                    'timeComparison':str, 'timeStart':tai93conv,
+                    'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
+                    'solarZenAngUpperCutoff':int,
+                    'fillVal':float, 'includePixelCount':boolCaster}
+        for (k,func) in castDict.items():
+            try:
+                self.parmDict[k] = func(self.parmDict[k])
+            except TypeError:
+                pass
+
+        #Perform some basic sanity checks with parameters
+        if self.parmDict['timeStart'] > self.parmDict['timeStop']:
+            msg = 'Input start time must come before stop time.'
+            raise IOError(msg)
+        if (len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outFieldNames']) or  
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outUnits']) or      
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['extraDimLabel'])):
+            msg = 'All field/unit inputs ' + \
+                'should have the same number of elements.'
+            raise IOError(msg)
+            
+        # create numpy arrays to hold our data
+        (minRow, maxRow, minCol, maxCol) = griddef.indLims()
+        nRows = maxRow - minRow + 1
+        nCols = maxCol - minCol + 1
+        nValidPixels = numpy.zeros((nRows, nCols))
+        sumWght = numpy.zeros((nRows, nCols, 1))  # needs extra dim to generalize for 3D vars
+        sumVars = dict()
+        for field, size in zip(self.parmDict['inFieldNames'], self.parmDict['extraDimSize']):
+            if size:
+                sumVars[field] = numpy.zeros((nRows, nCols, size))
+            else:
+                # pad with a singlet dim if it was 2D
+                sumVars[field] = numpy.zeros((nRows, nCols, 1))
+        
+        # loop over maps
+        if not isinstance(maps, list):
+            maps = [maps] # create list if we only got a single map
+        
+        for map in maps:
+            # open up context manager
+            with map.pop('parser') as parser: # remove parser for looping
+                if verbose:
+                    print('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now())))
+
+                # loop over gridboxes in map and calculate weights
+                for (gridCell, pixTup) in map.iteritems():
+                    # translate gridCell to account 
+                    # for possible non-zero ll corner
+                    gridRow = gridCell[0]
+                    gridCol = gridCell[1]
+                    gridInd = (gridRow - minRow, gridCol - minCol)
+                    # get the values needed to calculate weight
+                    for (pxInd, weight) in pixTup:
+                        # check summary flag
+                        sumFlag = parser.get_cm(\
+                                  self.parmDict['overallQualFlag'], pxInd)                                  
+                        if sumFlag != 0:
+                            continue
+                        # check cloud fraction flag
+                        cFrac = parser.get_cm(\
+                                self.parmDict['cloudFrac'], pxInd)
+                        if cFrac > self.parmDict['cloudFractUpperCutoff'] or \
+                            cFrac < 0.:
+                            continue
+                        # check solar zenith angle flag
+                        solZenAng = parser.get_cm(\
+                                   self.parmDict['solarZenithAngle'], pxInd)
+                        if solZenAng > self.parmDict[\
+                                              'solarZenAngUpperCutoff']:
+                            continue
+                        # check time flag
+                        # convert time and date to TAI93
+                        time = _convert_GOME2_time_to_TAI93(\
+                                parser.get_cm(self.parmDict['date'], pxInd),\
+                                parser.get_cm(self.parmDict['time'], pxInd))
+                        
+                        # calculate and factor in offset 
+                        # if the user wanted us to
+                        if self.parmDict['timeComparison'] == 'local':
+                            pixLon = parser.get_cm(\
+                                         self.parmDict['longitude'], pxInd)
+                            offset = utils.UTCoffset_from_lon(pixLon)
+                            time += offset
+                        if time < self.parmDict['timeStart'] \
+                               or time > self.parmDict['timeStop']:
+                            continue
+                        # read in all the data 
+                        # abandon ship if data is all NaN
+                        rawDataDict = {}
+                        try:
+                            for field in self.parmDict['inFieldNames']:
+                                rawData = parser.get_cm(field, pxInd)
+                                if numpy.isnan(rawData).all():
+                                    raise invalidPixCeption
+                                rawDataDict[field] = rawData
+                        except invalidPixCeption:
+                            continue
+                        
+                        # sanity check for weight
+                        assert weight != numpy.NaN
+                        if weight > 0:
+                            nValidPixels[gridInd] += 1
+                        # add the weight to the total for this cell
+                        sumWght[gridInd] += weight
+                        # apply weight to each field
+                        for field in self.parmDict['inFieldNames']:
+                            weightVals = rawDataDict[field] * weight
+                            if weightVals.size > 1:
+                                sumVars[field][gridInd] = \
+                                     numpy.nansum([sumVars[field][gridInd],\
+                                                   weightVals], axis=0)        
+                            else:
+                                sumVars[field][gridInd] = \
+                                     numpy.nansum([sumVars[field][gridInd][0],\
+                                                   weightVals])
+                map['parser'] = parser  # return parser to map
+                
+        # divide out variables by weights to get avgs. 
+        oldSettings = numpy.seterr(divide='ignore')
+        avgs = dict()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for (field,var) in sumVars.iteritems():
+                unfiltAvgs = var/sumWght
+                filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, \
+                           self.parmDict['fillVal'])
+                # strip trailing singlet for 2D arrays
+                if filtAvgs.shape[-1] == 1:
+                    avgs[field] = filtAvgs.reshape(filtAvgs.shape[0:2])
+                else:
+                    avgs[field] = filtAvgs
+        numpy.seterr(divide=oldSettings['divide'])
+
+        
+        # associate coindexed parameters into dicts 
+        # so we can loop by field
+        outFnames = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(izip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+                
+        # write out results to a netcdf file
+        outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
+        # create the 2 dimensions all files use
+        outFid.createDimension('row', nRows)
+        outFid.createDimension('col', nCols)
+        # write global attributes
+        setattr(outFid, 'Version', vsnmsg(version))
+        setattr(outFid, 'File_start_time', utils.nsecs_to_timestr(self.parmDict['timeStart'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'File_end_time', utils.nsecs_to_timestr(self.parmDict['timeStop'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'Max_valid_cloud_fraction', self.parmDict['cloudFractUpperCutoff'])
+        setattr(outFid, 'Max_valid_solar_zenith_angle', self.parmDict['solarZenAngUpperCutoff'])
+        setattr(outFid, 'Time_comparison_scheme', self.parmDict['timeComparison'])
+        fileListStr = ' '.join([map['parser'].name for map in maps])
+        setattr(outFid, 'Input_files', fileListStr)
+        setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
+        for (k,v) in griddef.parms.iteritems():
+            setattr(outFid, k, v)
+        # loop over fields and write variables
+        for field in self.parmDict['inFieldNames']:
+            # create tuple of dimensions, defining new dim
+            # if necessary
+            if len(avgs[field].shape) == 2:
+                # only row/cols
+                varDims = ('row', 'col')
+            elif len(avgs[field].shape) == 3:
+                # has extra dim
+                dimName = extraDim[field]
+                dimSize = avgs[field].shape[2]
+                if dimName not in outFid.dimensions.keys():
+                    outFid.createDimension(dimName, dimSize)
+                varDims = ('row', 'col', dimName)
+            # create and assign value to variable
+            varHandle = outFid.createVariable(outFnames[field], 'd', varDims, fill_value=self.parmDict['fillVal'])
+            varHandle[:] = avgs[field]
+            # assign variable attributes
+            setattr(varHandle, 'Units', units[field])
+        # Write out the pixel counts if the user requested them
+        # if they asked for pixel counts, also write out cumulative weight
+        if self.parmDict['includePixelCount']:
+            varDims = ('row', 'col')
+            # write out pixel count
+            varHandle = outFid.createVariable('ValidPixelCount', 'i', varDims, 
+                                              fill_value=self.parmDict['fillVal'])
+            varHandle[:] = nValidPixels
+            # write out cumulative weight
+            varHandle = outFid.createVariable('CumulativeWeight', 'i', varDims, 
+                                              fill_value=self.parmDict['fillVal'])
+            varHandle[:] = sumWght
+        outFid.close()
+        # create a dict with the same data as avgs, but diff names
+        outAvg = dict()
+        for (k,v) in avgs.iteritems():
+            outAvg[outFnames[k]] = v
+        if self.parmDict['includePixelCount']:
+            outAvg['ValidPixelCount'] = nValidPixels
+        return outAvg
+
+class OMNO2d_OMI_netCDF_avg_out_func(out_func):
+    '''
+    Weighted average for a given set of filtered values
+    based on OMNO2d algorithm.
+    
+    Assumptions:
+        - this algorithm assumes that fields to be averaged will have,
+        at most, 1 extra dimension.  If not, an assertion error is raised.
+        - this algorithm is undefined for cases where the weight of a term
+        is nonzero, but the term contains a fillValue.  If this condition
+        is met, unexpected results may occur.  This assumption is NOT checked. 
+    
+    OMNO2d algorithm and theoretical basis laid out
+    at <https://acdisc.gesdisc.eosdis.nasa.gov/data/Aura_OMI_Level3/OMNO2d.003/doc/README.OMNO2.pdf>
     
     Set up to work specifically for OMI instruments.
 
@@ -2583,10 +2893,6 @@ class OMISO2_netCDF_avg_out_func(out_func):
             Flag used as overall quality.  Assumed that
             when this flag is set, the data is BAD and 
             the pixel is ignored
-        XtrackQualityFlags:
-            Flag used as overall quality.  Assumed that
-            when this flag is set, the data is BAD and 
-            the pixel is ignored            
         cloudFrac:
             field with cloud fraction (0 to 1).  When this
             field is GREATER than the cutoff value the
@@ -2680,7 +2986,7 @@ class OMISO2_netCDF_avg_out_func(out_func):
     '''
     @staticmethod
     def parm_list():
-        return ['overallQualFlag', 'XtrackQualityFlags','cloudFrac', 'solarZenithAngle',
+        return ['overallQualFlag', 'cloudFrac', 'solarZenithAngle',
                 'time', 'longitude', 'inFieldNames', 'outFieldNames',
                 'outUnits', 'extraDimLabel', 'extraDimSize',
                 'timeComparison', 'timeStart', 'timeStop',
@@ -2695,8 +3001,6 @@ class OMISO2_netCDF_avg_out_func(out_func):
                                      'valid pixels.\n{ OMI KNMI - Tropo' \
                                      'sphericColumnFlag\n  OMI NASA - vcd' \
                                      'QualityFlags }',None),
-                'XtrackQualityFlags' : ('The name of field containing the row'\
-                	                    'anomaly Flags', None),                     
                 'cloudFrac' : ('The name of the field containing the ' \
                                'cloud fractions\n{ OMI KNMI - CloudFraction' \
                                '\n  OMI NASA - CloudFraction }',None),
@@ -2797,7 +3101,7 @@ class OMISO2_netCDF_avg_out_func(out_func):
         # even though IO interface handles casting already,
         # a catchblock has been added here for safety
         # in case someone wants to use this class directly
-        castDict = { 'overallQualFlag':str,'XtrackQualityFlags':str,'cloudFrac':str,
+        castDict = {'overallQualFlag':str, 'cloudFrac':str,
                     'solarZenithAngle':str, 'time':str,
                     'longitude':str, 'inFieldNames':list,
                     'outFieldNames':list, 'outUnits':list,
@@ -2850,27 +3154,23 @@ class OMISO2_netCDF_avg_out_func(out_func):
                 if verbose:
                     print('Processing {0} for output at {1}.'.format(\
                             parser.name, str(datetime.datetime.now())))
-		
+
                 # loop over gridboxes in map and calculate weights
                 for (gridCell, pixTup) in map.iteritems():
-		    # translate gridCell to account 
+                    # translate gridCell to account 
                     # for possible non-zero ll corner
                     gridRow = gridCell[0]
                     gridCol = gridCell[1]
                     gridInd = (gridRow - minRow, gridCol - minCol)
                     # get the values needed to calculate weight
-                    for (pxInd, unused_weight) in pixTup:
+                    for (pxInd, weight) in pixTup:
                         # check summary flag
-                        #sumFlag = parser.get_cm(\
-                        #          self.parmDict['overallQualFlag'], pxInd)
-                        #xtrackFlag = parser.get_cm(\
-                        #          self.parmDict['XtrackQualityFlags'], pxInd)                                  
+                        sumFlag = parser.get_cm(\
+                                  self.parmDict['overallQualFlag'], pxInd)
                         cFrac = parser.get_cm(\
-                               self.parmDict['cloudFrac'], pxInd)                                   
-			#if sumFlag != 0:
-                        #    continue
-                        #if xtrackFlag != 0:
-                        #	  continue
+                                self.parmDict['cloudFrac'], pxInd)                                  
+                        if sumFlag % 2:
+                            continue
                         # check cloud fraction flag
                        
                         if not (cFrac <= self.parmDict[\
@@ -2884,6 +3184,7 @@ class OMISO2_netCDF_avg_out_func(out_func):
                             continue
                         # check time flag
                         time = parser.get_cm(self.parmDict['time'], pxInd)
+                        
                         # calculate and factor in offset 
                         # if the user wanted us to
                         if self.parmDict['timeComparison'] == 'local':
@@ -2905,11 +3206,9 @@ class OMISO2_netCDF_avg_out_func(out_func):
                                 rawDataDict[field] = rawData
                         except invalidPixCeption:
                             continue
-                        # compute the weight
-                        fov = pxInd[self.parmDict['pixIndXtrackAxis']]
-                        weight = _OMNO2e_formula(cFrac, fov)
+                        # perform some sanity checks with the weight
                         assert weight != numpy.NaN
-                        if weight > 0:
+                        if weight > 0.:
                             nValidPixels[gridInd] += 1
 
                         # add the weight to the total for this cell 
@@ -2986,11 +3285,17 @@ class OMISO2_netCDF_avg_out_func(out_func):
             # assign variable attributes
             setattr(varHandle, 'Units', units[field])
         # Write out the pixel counts if the user requested them
+        # If they asked for pixel counts, also write out cumulative weights 
         if self.parmDict['includePixelCount']:
             varDims = ('row', 'col')
+            # write out pixel count
             varHandle = outFid.createVariable('ValidPixelCount', 'i', varDims, 
                                               fill_value=self.parmDict['fillVal'])
             varHandle[:] = nValidPixels
+            # write out cumulative weight
+            varHandle = outFid.createVariable('CumulativeWeight', 'i', varDims, 
+                                              fill_value=self.parmDict['fillVal'])
+            varHandle[:] = sumWght
         outFid.close()
         # create a dict with the same data as avgs, but diff names
         outAvg = dict()
@@ -2999,4 +3304,3 @@ class OMISO2_netCDF_avg_out_func(out_func):
         if self.parmDict['includePixelCount']:
             outAvg['ValidPixelCount'] = nValidPixels
         return outAvg
-

@@ -29,7 +29,7 @@ def wrap_lon_neg180_180(lon):
     while lon > 180:
         lon -= 360
     return lon
-
+    
 def timestr_to_nsecs(timestr, 
                      epoch='00:00:00 01-01-1970', 
                      format='%H:%M:%S %m-%d-%Y'):
@@ -252,3 +252,84 @@ def parse_filetype(namespace):
     except:
         pass
     return namespace
+
+def cylEqualArea(lat, lon, centralMeridian=0., stdPar=0., earthRadius=6371.):
+    """
+    Source: Map Projections, a Working Manual (USGS 1987)
+    """
+    deg2rad = numpy.pi/180.
+    
+    x = earthRadius * deg2rad*(lon-centralMeridian) * numpy.cos(deg2rad*stdPar)
+    y = earthRadius * numpy.sin(deg2rad*lat) / numpy.cos(deg2rad*stdPar)
+    return (y,x)
+
+def sinEqualArea(lat, lon, centralMeridian=0., earthRadius=6371.):
+    deg2rad = numpy.pi/180.
+    latDist = numpy.pi * earthRadius / 180.
+    
+    x = (lon - centralMeridian) * latDist * numpy.cos(deg2rad*lat)
+    y = lat * latDist
+    return (y,x)
+
+def greatCircleBearing(lat1, lon1, lat2, lon2):
+    # ADD HANDLING OF DIV BY ZERO
+    deg2rad = numpy.pi/180.
+    dLong = lon1 - lon2
+    compLat1 = lat1 - 90.
+    compLat2 = lat2 - 90.
+    
+    opp = numpy.sin(deg2rad*dLong)
+    adj = numpy.sin(deg2rad*compLat1)/numpy.tan(deg2rad*compLat2) - \
+        numpy.cos(deg2rad*compLat1)*numpy.cos(deg2rad*dLong)
+        
+    return numpy.arctan2(opp,adj)
+
+def sphericalArea(lats, lons, earthRadius=6371.):
+    N = len(lons)
+    
+    angles = numpy.empty(N)
+    for i in range(N):
+        phiB1, phiA, phiB2 = numpy.roll(lats, i)[:3]
+        LB1, LA, LB2 = numpy.roll(lons, i)[:3]
+        
+        # calculate angle with north (eastward)
+        beta1 = greatCircleBearing(LA, phiA, LB1, phiB1)
+        beta2 = greatCircleBearing(LA, phiA, LB2, phiB2)
+        
+        # calculate angles between the polygons and add to single array
+        angles[i] = numpy.arccos(numpy.cos(-beta1)*numpy.cos(-beta2) + 
+                                  numpy.sin(-beta1)*numpy.sin(-beta2))
+        
+    area = (numpy.sum(angles) - (N-2)*numpy.pi)*earthRadius**2.
+    
+    return area
+
+def greatCircleBearing_BORKED(lat1, lon1, lat2, lon2):
+    deg2rad = numpy.pi/180.
+    dLong = lon1 - lon2
+    
+    s = numpy.cos(deg2rad*lat2)*numpy.sin(deg2rad*dLong)
+    c = numpy.cos(deg2rad*lat1)*numpy.sin(deg2rad*lat2) - \
+        numpy.sin(deg2rad*lat1)*numpy.cos(deg2rad*lat2)*numpy.cos(deg2rad*dLong)
+        
+    return numpy.arctan2(s,c)
+
+def sphericalArea_BORKED(lats, lons, earthRadius=6371.):
+    N = len(lons)
+    
+    angles = numpy.empty(N)
+    for i in range(N):
+        phiB1, phiA, phiB2 = numpy.roll(lats, i)[:3]
+        LB1, LA, LB2 = numpy.roll(lons, i)[:3]
+        
+        # calculate angle with north (eastward)
+        beta1 = greatCircleBearing_BORKED(LA, phiA, LB1, phiB1)
+        beta2 = greatCircleBearing_BORKED(LA, phiA, LB2, phiB2)
+        
+        # calculate angles between the polygons and add to single array
+        angles[i] = numpy.arccos(numpy.cos(-beta1)*numpy.cos(-beta2) + 
+                                  numpy.sin(-beta1)*numpy.sin(-beta2))
+        
+    area = (numpy.sum(angles) - (N-2)*numpy.pi)*earthRadius**2.
+    
+    return area

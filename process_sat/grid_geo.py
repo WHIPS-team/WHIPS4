@@ -236,3 +236,93 @@ class lcc2par_GridDef(GridDef):
         y = row*self.parms['yCell']+self.parms['yOrig']
         x = col*self.parms['xCell']+self.parms['xOrig']
         return self.projectedToGeo(y,x)        
+
+class cylequalarea_GridDef(GridDef):
+    '''
+    Performs transformations with the Cylindrical Equal Area projection.
+    Uses pyproj. For more information on this projection, reference:
+    Map Projections, a Working Manual (USGS 1987)
+    '''
+    @staticmethod
+    def parm_list():
+        return ['stdPar', 'refLon', 'xOrig', 'yOrig', 
+                'xCell', 'yCell', 'nRows', 'nCols', 'earthRadius']
+
+    @staticmethod
+    def requiredParms():
+        '''
+        parameters that must be in the dictionary passed to
+        instantiate this class
+        '''
+        return {"stdPar":('The standard parallel (latitude) '\
+                               'used to define the Lambert Conic '\
+                               'Conformal projection, in degrees.'
+                               'The two standard parallels are +/-stdPar.',
+                               'decimal'),
+                "refLon":('The reference longitude upon which the projection '\
+                              'is centered, in degrees.  This is BOTH the '\
+                              'XCENT and PROJ_GAMMA values in the GRIDDESC '\
+                              'file.  If these values are not identical, '\
+                              'do not use this function', 'decimal'),
+                "xOrig":('The location of the origin in projected '\
+                             'x coordinates, in the same units as earthRadius.'\
+                             '  This is the XORIG value in the GRIDDESC file', 
+                         'decimal'),
+                "yOrig":('The location of the origin in projected y '\
+                             'coordinates, in the same units as earthRadius.  '\
+                             'This is the YORIG value in the GRIDDESC file', 
+                         'decimal'),
+                "xCell":('The x dimension of a cell in projected coordinates, '\
+                             'in the same units as earthRadius.  This is the '\
+                             'XCELL value in the GRIDDESC file', 'posdecimal'),
+                "yCell":('The y dimension of a cell in projected coordinates,'\
+                             ' in the same units as earthRadius.  This is the '\
+                             'YCELL value in the GRIDDESC file', 'posdecimal'),
+                "nRows":('The number of rows in the grid', 'posint'),
+                "nCols":('The number of columns in the grid', 'posint'),
+                "earthRadius":('The assumed radius of the Earth '\
+                                  '(assumed spherical).  Must match units used'\
+                                  ' for xCell and yCell','posdecimal')}
+    def __init__(self, parms):
+        GridDef.__init__(self, parms)
+
+        # cast everything even though type is ensured (even though IO
+        # interface does this) in case someone wants to use the class directly
+        castDict = {"stdPar" : float, "refLon" : float,
+                    "xOrig" : float, "yOrig" : float,
+                    "xCell" : float, "yCell" : float,
+                    "nRows" : int, "nCols" : int}
+        for (k,func) in castDict.items():
+            parms[k] = func(parms[k])
+        self.parms = parms
+
+        # remap parms into a dictionary readable by pyproj
+        pyprojParms = {'proj'   : 'cea',
+                       'a'      : parms['earthRadius'],
+                       'lon_0'  : parms['refLon'],
+                       'lat_ts'  : parms['stdPar'],
+                       'x_0'    : 0,
+                       'y_0'    : 0}
+        self.__proj = Proj(pyprojParms)
+    def indLims(self):
+        return (0, self.parms['nRows']-1,
+                 0, self.parms['nCols']-1)
+    def geoToProjected(self, lat, lon):
+        (x,y) = self.__proj(lon, lat)
+        return (y,x)
+    def geoToGridded(self, lat, lon):
+        (y,x) = self.geoToProjected(lat, lon)
+        # transform x and y to new origin
+        y = y-self.parms['yOrig']
+        x = x-self.parms['xOrig']
+        # convert from projected coordinates to cells
+        row = y/self.parms['yCell']
+        col = x/self.parms['xCell']
+        return (row, col)
+    def projectedToGeo(self, y, x):
+        (lon,lat) = self.__proj(x, y, inverse=True)
+        return (lat, lon)
+    def griddedToGeo(self, row, col):
+        y = row*self.parms['yCell']+self.parms['yOrig']
+        x = col*self.parms['xCell']+self.parms['xOrig']
+        return self.projectedToGeo(y,x)     
