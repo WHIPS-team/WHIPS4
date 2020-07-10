@@ -359,12 +359,12 @@ def OMNO2d_regional_map_geo(parser, griddef, verbose=True):
     #GOME-2
     minPixArea = 3150.
     maxPixArea = 5800.
-    #maxPixArea = 15500.
+#   maxPixArea = 15500.
     
     #OMI
     # todo
-#    minPixArea = 250
-#    maxPixArea = 2100
+#    minPixArea = 250.
+#    maxPixArea = 2100.
     print minPixArea
     print maxPixArea
     #end temp
@@ -383,24 +383,17 @@ def OMNO2d_regional_map_geo(parser, griddef, verbose=True):
                 continue  # if none of the corners are in bounds, skip
             # find approx. pixel area (in km^2) using an equal area projection
             pixArea = geom.MultiPoint(zip(pxY, pxX)).convex_hull.area
-            # temp
+            # skip pixels which are too big or too small
             if pixArea<minPixArea:
                 continue
             if pixArea>maxPixArea:
                 continue
-            # end temp
             griddedPix += 1
             sys.stdout.write("\rApproximately {0} pixels gridded. ".\
                              format(griddedPix))
             sys.stdout.flush()
             pixPoly = geom.MultiPoint(zip(pxrow, pxcol)).convex_hull
             
-            # find the pixel with the min/max area in this map
-            #temp
-            #minPixArea = numpy.nanmin([minPixArea,pixArea]) 
-            #maxPixArea = numpy.nanmax([maxPixArea,pixArea]) 
-            #end temp
- 
             for key in map_helpers.get_possible_cells(outer_indices, pixPoly):
                 gridArea = gridPolys[key].area 
                 if prepPolys[key].intersects(pixPoly) and not \
@@ -412,7 +405,6 @@ def OMNO2d_regional_map_geo(parser, griddef, verbose=True):
         # loop again because we don't know min/maxPixArea until end of 1st loop
         if griddedPix != 0: # don't run if nothing gridded
             for (key, areaTup) in areaMap.iteritems(): # loop over gridcells
-                #print (key, areaTup)
                 for (pxind, areas) in areaTup: # loop over pixels
                     (pixArea, gridArea, overlapArea) = areas
                     wAi = 1. - (pixArea - minPixArea)/maxPixArea
@@ -423,36 +415,38 @@ def OMNO2d_regional_map_geo(parser, griddef, verbose=True):
         print('Done intersecting.')
 
     else:
-        griddedPix = 0 # omno2d
-        for (pxrow, pxcol, pxind, pxY, pxX) in \
-                                  izip(row, col, ind, equalAreaY, equalAreaX):
-            if numpy.any(numpy.isnan(pxrow)) or numpy.any(numpy.isnan(pxcol)):
-                continue  # if we have only a partial pixel, skip
-            elif not any([bounds.contains(geom.asPoint((r,c))) for (r,c) \
-                                        in izip(pxrow, pxcol)]):
-                continue  # if none of the corners are in bounds, skip
-            griddedPix += 1 # omno2d
-            pixPoly = geom.MultiPoint(zip(pxrow, pxcol)).convex_hull
-            pixArea = geom.MultiPoint(zip(pxY, pxX)).convex_hull.area # omno2d
-            # find the pixel with the min/max area in this map
-            minPixArea = numpy.nanmin([minPixArea,pixArea]) # omno2d
-            maxPixArea = numpy.nanmax([maxPixArea,pixArea]) # omno2d
-            for key in map_helpers.get_possible_cells(outer_indices, pixPoly):
-                gridArea = gridPolys[key].area # omno2d
-                if prepPolys[key].intersects(pixPoly) and not \
-                                  gridPolys[key].touches(pixPoly):
-                    overlapArea = pixPoly.intersection(gridPolys[key]).area # omno2d
-                    areaMap[key].append((tuple(pxind),tuple((pixArea,gridArea,overlapArea)))) # omno2d
-        #Calculate OMNO2d weights
-        # loop again because we don't know min/maxPixArea until end of 1st loop
-        if griddedPix != 0: # don't run if nothing gridded
-            for (key, areaTup) in areaMap.iteritems(): # loop over gridcells
-                for (pxind, areas) in areaTup: # loop over pixels
-                    (pixArea, gridArea, overlapArea) = areas
-                    wAi = 1. - (pixArea - minPixArea)/maxPixArea
-                    Qij = overlapArea / gridArea 
-                    weight = wAi * Qij
-                    map[key].append((tuple(pxind),weight)) 
+
+        raise NotImplementedError('Non-verbose version of OMNO2d_regional_map has  not been implemented. Please change to verbose=True')
+#        griddedPix = 0 # omno2d
+#        for (pxrow, pxcol, pxind, pxY, pxX) in \
+#                                  izip(row, col, ind, equalAreaY, equalAreaX):
+#            if numpy.any(numpy.isnan(pxrow)) or numpy.any(numpy.isnan(pxcol)):
+#                continue  # if we have only a partial pixel, skip
+#            elif not any([bounds.contains(geom.asPoint((r,c))) for (r,c) \
+#                                        in izip(pxrow, pxcol)]):
+#                continue  # if none of the corners are in bounds, skip
+#            griddedPix += 1 # omno2d
+#            pixPoly = geom.MultiPoint(zip(pxrow, pxcol)).convex_hull
+#            pixArea = geom.MultiPoint(zip(pxY, pxX)).convex_hull.area # omno2d
+#            # find the pixel with the min/max area in this map
+#            minPixArea = numpy.nanmin([minPixArea,pixArea]) # omno2d
+#            maxPixArea = numpy.nanmax([maxPixArea,pixArea]) # omno2d
+#            for key in map_helpers.get_possible_cells(outer_indices, pixPoly):
+#                gridArea = gridPolys[key].area # omno2d
+#                if prepPolys[key].intersects(pixPoly) and not \
+#                                  gridPolys[key].touches(pixPoly):
+#                    overlapArea = pixPoly.intersection(gridPolys[key]).area # omno2d
+#                    areaMap[key].append((tuple(pxind),tuple((pixArea,gridArea,overlapArea)))) # omno2d
+#        #Calculate OMNO2d weights
+#        # loop again because we don't know min/maxPixArea until end of 1st loop
+#        if griddedPix != 0: # don't run if nothing gridded
+#            for (key, areaTup) in areaMap.iteritems(): # loop over gridcells
+#                for (pxind, areas) in areaTup: # loop over pixels
+#                    (pixArea, gridArea, overlapArea) = areas
+#                    wAi = 1. - (pixArea - minPixArea)/maxPixArea
+#                    Qij = overlapArea / gridArea 
+#                    weight = wAi * Qij
+#                    map[key].append((tuple(pxind),weight)) 
                     
     return map
 
