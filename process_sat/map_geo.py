@@ -317,13 +317,10 @@ def OMNO2d_regional_map_geo(parser, griddef, verbose=True):
     map = map_helpers.init_output_map(outer_indices)
     areaMap = map_helpers.init_output_map(outer_indices) # omno2d
     map['parser'] = parser
-    minPixArea, maxPixArea = parser.get_min_max_pixel_area()
-   
-    #temp 
-    print minPixArea
-    print maxPixArea
-    #end temp
     bounds = prep(map_helpers.rect_bound_poly(outer_indices))
+    minPixArea, maxPixArea = parser.get_min_max_pixel_area()
+    if verbose: print('minPixArea: '+minPixArea+
+                      'km^2, maxPixArea: '+maxPixArea+'km^2') 
     
     # instantiate an equal area grid (for pixel areas)
     equalAreaGrid = grid_geo.cylequalarea_GridDef(
