@@ -781,7 +781,20 @@ class HDFnasaomil2_File(HDFFile):
         struct = numpy.zeros(lat.shape, dtype=protoDtype)
         (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
         return struct
-        
+
+    def get_min_max_pixel_size(self):
+    """
+    get_min_max_pixel_size() - returns the min/max OMI pixel size in km^2
+                        Used in the OMNO2d gridding algorithm.                         
+
+                        The min/max pixel sizes come from the 
+                        NASA OMI ground pixel product documentation: 
+                        https://doi.org/10.5067/Aura/OMI/DATA2020
+    """
+    minPixArea = 250.
+    maxPixArea = 2100.
+    return (minPixArea,maxPixArea)
+
 class HDFmopittl2_File(HDF4File):
     """
     Provide interface to MOPITT level 2 V5 product
@@ -1912,3 +1925,25 @@ class HDFgome2l2_File(HDF4File):
         struct = numpy.zeros(lat.shape[0], dtype=protoDtype)
         (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
         return struct
+
+    def get_min_max_pixel_size(self):
+    """
+    get_min_max_pixel_size() - returns the min/max GOME-2 pixel size in km^2
+                        Used in the OMNO2d gridding algorithm.                         
+
+                        The minimum and maximum pixel sizes here are a 
+                        guess based on the largest pixels in the year of 
+                        2013 (from Penn & Holloway 2020). GOME-2 has standard 
+                        pixels and huge "background" pixels that overlap
+                        the normal ones - I do not know why these exist, 
+                        but they are so large that the gridding 
+                        algorithm should not assign them too much weight.
+  
+                        Note that max pizel size of 15500km^2 will include these huge 
+                        "background" pixels. If you would like to ignore them, you can 
+                        use a max pixel size of ~5800km^2 instead. We used a maximum of 
+                        5800km^2 in Penn & Holloway 2020. 
+    """
+    minPixArea = 3150.
+    maxPixArea = 15500.
+    return (minPixArea,maxPixArea)
