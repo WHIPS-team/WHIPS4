@@ -23,7 +23,7 @@ equivalent:
     Holloway, Jacob Oberman, Peidong Wang, and Eliot Kim, with funding  
     from the NASA Air Quality Applied Science Team (AQAST), the NASA  
     Health and Air Quality Applied Sciences Team (HAQAST), and the 
-    The State of Texas Air Quality Research Program (AQRP).
+    State of Texas Air Quality Research Program (AQRP).
 
 
 QUICK START
