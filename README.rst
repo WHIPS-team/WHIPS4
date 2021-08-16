@@ -4,8 +4,8 @@ WHIPS 3.1.1
 
 * **Project Title:** WHIPS
 * **Purpose of Project:** Provide a well-documented, easy-to-use general-purpose processing module for processing satellite data
-* **Version:** 3.1.1 (04/21/19)
-* **Authors:** Tracey Holloway, Jacob Oberman, Peidong Wang
+* **Version:** 4.0 (08/16/21)
+* **Authors:** Tracey Holloway, Jacob Oberman, Peidong Wang, Eliot Kim
 * **Contact:** taholloway@wisc.edu
 
 Wisconsin Horizontal Interpolation Program for Satellites (WHIPS)
@@ -21,8 +21,9 @@ equivalent:
 	*use and development of the Wisconsin Horizontal Interpolation*
 	*Program for Satellites (WHIPS).  WHIPS was developed by Tracey* 
 	*Holloway, Jacob Oberman and Peidong Wang, with funding from* 
-	*the NASA Air Quality Applied Science Team (AQAST) and* 
-	*the NASA Health and Air Quality Applied Sciences Team (HAQAST).*
+	*the NASA Air Quality Applied Science Team (AQAST), the NASA * 
+	*Health and Air Quality Applied Sciences Team (HAQAST), and *
+	*the State of Texas Air Quality Research Program (AQRP). *
 
 
 QUICK START
@@ -32,11 +33,13 @@ QUICK START
 1. Install the program and run the built-in test module to confirm
 that it is working properly.  Installation instructions can be found
 in the WHIPS user guide.
+***note: user guide for version 4 forthcoming***
 
 
 2. Download whatever data you plan to process.  Currently, the program
 is designed to process OMI NO2 DOMINO level 2 data, OMI NO2 NASA level
-2 data, MOPITT CO data, NASA MODIS AOD level 2 data, and OMI SO2 level 2 data.  See the 
+2 data, MOPITT CO data, NASA MODIS AOD level 2 data, OMI SO2 level 2 data,
+TROPOMI NO2 level 2 data, and TROPOMI SO2 level 2 data.  See the 
 detailed documentation for the --filelist argument for locations of data.
 
 
