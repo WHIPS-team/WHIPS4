@@ -25,11 +25,13 @@ The returned dictionary must be formatted as follows:
         no weight is computed from this function)
 '''
 import sys
-from itertools import izip
+
 import datetime
 import pdb
 
-import map_helpers
+from builtins import zip
+from builtins import str
+from . import map_helpers
 
 from shapely.prepared import prep
 import shapely.geometry as geom
@@ -70,7 +72,7 @@ def global_intersect_map_geo(parser, griddef, verbose=True):
         - pixels are convex polygons
     '''
     if verbose:
-        print('Mapping '+parser.name+'\nat '+str(datetime.datetime.now()))  
+        print(('Mapping '+parser.name+'\nat '+str(datetime.datetime.now())))  
     outer_indices = griddef.indLims()
     # create the dictionary we'll use as a map
     map = map_helpers.init_output_map(outer_indices)
@@ -82,7 +84,7 @@ def global_intersect_map_geo(parser, griddef, verbose=True):
     prepPolys = map_helpers.rect_grid_polys(outer_indices)
     if verbose: print('prepping polys in grid')
     # prepare polygons, they're going to get compared a lot
-    for polykey in prepPolys.keys():
+    for polykey in list(prepPolys.keys()):
         prepPolys[polykey] = prep(prepPolys[polykey])
     if verbose: print('done prepping polys in grid')
     cornersStruct = parser.get_geo_corners()
@@ -99,11 +101,11 @@ def global_intersect_map_geo(parser, griddef, verbose=True):
     minCol = griddef.indLims()[2]
     maxCol = griddef.indLims()[3] + 1
     midCol = (minCol+maxCol)/2.0
-    for (pxrow, pxcol, pxind) in izip(row, col, ind):
+    for (pxrow, pxcol, pxind) in zip(row, col, ind):
         if (numpy.any(numpy.isnan(pxrow)) or 
             numpy.any(numpy.isnan(pxcol))):
             continue # skip incomplete pixels
-        pointsTup = zip(pxrow, pxcol)
+        pointsTup = list(zip(pxrow, pxcol))
         prelimPoly = geom.MultiPoint(pointsTup).convex_hull
         (bbBot, bbLeft, bbTop, bbRight) = prelimPoly.bounds
         if bbLeft < midCol and bbRight > midCol:
@@ -157,7 +159,7 @@ def regional_intersect_map_geo(parser, griddef, verbose=True):
     '''
     
     if verbose:
-        print('Mapping '+parser.name+'\nat '+str(datetime.datetime.now()))
+        print(('Mapping '+parser.name+'\nat '+str(datetime.datetime.now())))
     outer_indices = griddef.indLims()
     map = map_helpers.init_output_map(outer_indices)
     map['parser'] = parser
@@ -169,7 +171,7 @@ def regional_intersect_map_geo(parser, griddef, verbose=True):
     prepPolys = map_helpers.rect_grid_polys(outer_indices)
     if verbose: print('prepping polys in grid')
     # prepare polygons, they're going to get compared a lot
-    for polykey in prepPolys.keys():
+    for polykey in list(prepPolys.keys()):
         prepPolys[polykey] = prep(prepPolys[polykey])  
     if verbose: print('done prepping polys in grid')
     cornersStruct = parser.get_geo_corners()
@@ -185,17 +187,17 @@ def regional_intersect_map_geo(parser, griddef, verbose=True):
         print('Intersecting pixels')
         sys.stdout.write("Approximately 0 pixels gridded. ")
         sys.stdout.flush()
-        for (pxrow, pxcol, pxind) in izip(row, col, ind):
+        for (pxrow, pxcol, pxind) in zip(row, col, ind):
             if numpy.any(numpy.isnan(pxrow)) or numpy.any(numpy.isnan(pxcol)):
                 continue  # if we have only a partial pixel, skip
             elif not any([bounds.contains(geom.asPoint((r,c))) \
-                       for (r,c) in izip(pxrow, pxcol)]):
+                       for (r,c) in zip(pxrow, pxcol)]):
                 continue  # if none of the corners are in bounds, skip
             griddedPix += 1
             sys.stdout.write("\rApproximately {0} pixels gridded. ".\
                              format(griddedPix))
             sys.stdout.flush()
-            pixPoly = geom.MultiPoint(zip(pxrow, pxcol)).convex_hull
+            pixPoly = geom.MultiPoint(list(zip(pxrow, pxcol))).convex_hull
             
             for key in map_helpers.get_possible_cells(outer_indices, pixPoly):
                 if prepPolys[key].intersects(pixPoly) and not \
@@ -203,13 +205,13 @@ def regional_intersect_map_geo(parser, griddef, verbose=True):
                     map[key].append((tuple(pxind), None))
         print('Done intersecting.')
     else:
-        for (pxrow, pxcol, pxind) in izip(row, col, ind):
+        for (pxrow, pxcol, pxind) in zip(row, col, ind):
             if numpy.any(numpy.isnan(pxrow)) or numpy.any(numpy.isnan(pxcol)):
                 continue  # if we have only a partial pixel, skip
             elif not any([bounds.contains(geom.asPoint((r,c))) for (r,c) \
-                                        in izip(pxrow, pxcol)]):
+                                        in zip(pxrow, pxcol)]):
                 continue  # if none of the corners are in bounds, skip
-            pixPoly = geom.MultiPoint(zip(pxrow, pxcol)).convex_hull
+            pixPoly = geom.MultiPoint(list(zip(pxrow, pxcol))).convex_hull
             for key in map_helpers.get_possible_cells(outer_indices, pixPoly):
                 if prepPolys[key].intersects(pixPoly) and not \
                                   gridPolys[key].touches(pixPoly):
@@ -244,7 +246,7 @@ def point_in_cell_map_geo(parser, griddef, verbose=True):
         the 0,0 gridbox.
     '''
     if verbose:
-        print('Mapping '+parser.name+'\nat '+str(datetime.datetime.now()))
+        print(('Mapping '+parser.name+'\nat '+str(datetime.datetime.now())))
     # Create an empty map to be filled
     mapLims = griddef.indLims()
     map = map_helpers.init_output_map(mapLims)
@@ -264,7 +266,7 @@ def point_in_cell_map_geo(parser, griddef, verbose=True):
         print('Assigning pixels to gridboxes.')
         sys.stdout.write("Approximately 0 pixels gridded. ")
         sys.stdout.flush()
-        for (pxrow, pxcol, pxind) in izip(row, col, ind):
+        for (pxrow, pxcol, pxind) in zip(row, col, ind):
             if minRow <= pxrow <= maxRow and minCol <= pxcol <= maxCol:
                 map[(pxrow, pxcol)].append((tuple(pxind), None))
                 nGriddedPix += 1
@@ -273,7 +275,7 @@ def point_in_cell_map_geo(parser, griddef, verbose=True):
                 sys.stdout.flush()
         print('Done intersecting.')
     else:
-        for (pxrow, pxcol, pxind) in izip(row, col, ind):
+        for (pxrow, pxcol, pxind) in zip(row, col, ind):
             if minRow <= pxrow <= maxRow and minCol <= pxcol <= maxCol:
                 map[(pxrow, pxcol)].append((tuple(pxind), None))
     return map

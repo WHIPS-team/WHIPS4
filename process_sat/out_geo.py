@@ -32,16 +32,19 @@ may choose to call outputs output0-0, output0-1, etc...
 though something more descriptive is preferable)
 '''
 import sys
-from itertools import izip
+
 import datetime
 import warnings
 import pdb
 
-
 import numpy
 import netCDF4
 
-import utils
+from . import utils
+from builtins import object
+from builtins import zip
+from builtins import str
+from builtins import range
 
 def vsnmsg(version): 
     return "This file was generated using WHIPS v{0}".format(version)
@@ -52,7 +55,7 @@ def ValidOutfuncs():
     names = dir(currentModule)
     return [el[:-9] for el in names if el.endswith("_out_func")]
 
-class out_func:
+class out_func(object):
     '''Abstract class to for <>_out_geo classes'''
     def __init__(self, parmDict=None):
         self.parmDict = parmDict
@@ -73,7 +76,7 @@ def _OMNO2e_formula(cloudFrac, fieldOfView):
 class invalidPixCeption(Exception):
     pass
     
-tai93conv = lambda(timestring):utils.timestr_to_nsecs(timestring, 
+tai93conv = lambda timestring:utils.timestr_to_nsecs(timestring, 
                                '00:00:00_01-01-1993', '%H:%M:%S_%m-%d-%Y')
 
 def boolCaster(boolStr):
@@ -179,7 +182,7 @@ class OMNO2e_wght_avg_BORKED(out_func):
                     'cloudFractUpperCutoff':float, 
                     'solarZenAngUpperCutoff':float,
                     'pixIndXtrackAxis':int, 'fillVal':float}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             self.parmDict[k] = func(self.parmDict[k])
 
         '''Write out single weighted-avg file'''
@@ -193,9 +196,9 @@ class OMNO2e_wght_avg_BORKED(out_func):
         for map in maps:
             with map.pop('parser') as p: # pop out so we can loop
                 if verbose:
-                    print('Processing {0} for output at {1}.'.format(\
-                            p.name, str(datetime.datetime.now())))
-                for (k,v) in map.iteritems():
+                    print(('Processing {0} for output at {1}.'.format(\
+                            p.name, str(datetime.datetime.now()))))
+                for (k,v) in map.items():
                     sumFlag = numpy.array([p.get_cm(self.parmDict['overallQualFlag'], pxind)
                                             for (pxind, unused_weight) in v])
                     sumFlag = numpy.mod(sumFlag, 2)
@@ -452,8 +455,8 @@ class OMNO2e_netCDF_avg_out_func(out_func):
             try:
                 dimsizes[i] = int(dimsizes[i])
             except ValueError:
-                print ("Warning: {0} is not a valid extraDimSize value.  " \
-                      "Using 0 instead").format(dimsizes[i])
+                print(("Warning: {0} is not a valid extraDimSize value.  " \
+                      "Using 0 instead").format(dimsizes[i]))
                 dimsizes[i] = 0
                 continue
         self.parmDict['extraDimSize'] = dimsizes
@@ -470,7 +473,7 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                     'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
                     'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
                     'fillVal':float, 'includePixelCount':boolCaster}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             try:
                 self.parmDict[k] = func(self.parmDict[k])
             except TypeError:
@@ -512,11 +515,11 @@ class OMNO2e_netCDF_avg_out_func(out_func):
             # open up context manager
             with map.pop('parser') as parser: # remove parser for looping
                 if verbose:
-                    print('Processing {0} for output at {1}.'.format(\
-                            parser.name, str(datetime.datetime.now())))
+                    print(('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now()))))
 
                 # loop over gridboxes in map and calculate weights
-                for (gridCell, pixTup) in map.iteritems():
+                for (gridCell, pixTup) in map.items():
                     # translate gridCell to account 
                     # for possible non-zero ll corner
                     gridRow = gridCell[0]
@@ -591,7 +594,7 @@ class OMNO2e_netCDF_avg_out_func(out_func):
         avgs = dict()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            for (field,var) in sumVars.iteritems():
+            for (field,var) in sumVars.items():
                 unfiltAvgs = var/sumWght
                 filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, \
                            self.parmDict['fillVal'])
@@ -605,9 +608,9 @@ class OMNO2e_netCDF_avg_out_func(out_func):
         
         # associate coindexed parameters into dicts 
         # so we can loop by field
-        outFnames = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
-        units = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
-        extraDim = dict(izip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+        outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
                 
         # write out results to a netcdf file
         outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
@@ -624,7 +627,7 @@ class OMNO2e_netCDF_avg_out_func(out_func):
         fileListStr = ' '.join([map['parser'].name for map in maps])
         setattr(outFid, 'Input_files', fileListStr)
         setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
-        for (k,v) in griddef.parms.iteritems():
+        for (k,v) in griddef.parms.items():
             setattr(outFid, k, v)
         # loop over fields and write variables
         for field in self.parmDict['inFieldNames']:
@@ -637,7 +640,7 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                 # has extra dim
                 dimName = extraDim[field]
                 dimSize = avgs[field].shape[2]
-                if dimName not in outFid.dimensions.keys():
+                if dimName not in list(outFid.dimensions.keys()):
                     outFid.createDimension(dimName, dimSize)
                 varDims = ('row', 'col', dimName)
             # create and assign value to variable
@@ -654,7 +657,7 @@ class OMNO2e_netCDF_avg_out_func(out_func):
         outFid.close()
         # create a dict with the same data as avgs, but diff names
         outAvg = dict()
-        for (k,v) in avgs.iteritems():
+        for (k,v) in avgs.items():
             outAvg[outFnames[k]] = v
         if self.parmDict['includePixelCount']:
             outAvg['ValidPixelCount'] = nValidPixels
@@ -826,7 +829,7 @@ class wght_avg_netCDF(out_func):
         canonicalLength = len(self.parmDict['inFieldNames'])
         isCorrectLength = [len(self.parmDict[list]) == canonicalLength for list in lists]
         if not all(isCorrectLength):
-            wrongLength = [name for (name, corr) in izip(lists,isCorrectLength) if not corr]
+            wrongLength = [name for (name, corr) in zip(lists,isCorrectLength) if not corr]
             msg = "All lists must be the same length.  The following list lengths do " \
                 "not match the length of inFieldNames: " + ' '.join(wrongLength)
             raise ValueError(msg)
@@ -835,9 +838,9 @@ class wght_avg_netCDF(out_func):
         labelTups = self.parmDict['dimLabels']
         sizeTups = self.parmDict['dimSizes']
         # confirm that each tuple is the same size
-        tupsMatch = [len(l) == len(s) for (l,s) in izip(labelTups, sizeTups)]
+        tupsMatch = [len(l) == len(s) for (l,s) in zip(labelTups, sizeTups)]
         if not all(tupsMatch):
-            misMatch = [l + ' does not match ' + s for (l,s,m) in izip(labelTups,sizeTups,tupsMatch) if not m]
+            misMatch = [l + ' does not match ' + s for (l,s,m) in zip(labelTups,sizeTups,tupsMatch) if not m]
             msg = "All tuple-like strings must correspond to tuples of corresponding size. " \
                 "The following sets do not correspond: \n" + '\n'.join(misMatch)
             raise ValueError(msg)
@@ -865,7 +868,7 @@ class wght_avg_netCDF(out_func):
         # keyed off of inFieldNames
         inFnames = self.parmDict['inFieldNames']  
         for key in lists:
-            self.parmDict[key] = dict(zip(inFnames, self.parmDict[key]))
+            self.parmDict[key] = dict(list(zip(inFnames, self.parmDict[key])))
         
     def __call__(self, maps, griddef, outfilename, verbose, version):
         '''Write out a weighted-average file in netcdf format.'''
@@ -908,11 +911,11 @@ class wght_avg_netCDF(out_func):
         for map in maps:
             with map.pop('parser') as p: 
                 if verbose:
-                    print('Processing %s for output at %s' %
-                          (p.name, str(datetime.datetime.now())))
+                    print(('Processing %s for output at %s' %
+                          (p.name, str(datetime.datetime.now()))))
                     
                 # loop over the cells in the map, processing each
-                for (cellInd, pixTups) in map.iteritems():
+                for (cellInd, pixTups) in map.items():
                     
                     # compute the weight only if we haven't already.  In either
                     # case, put the weights in array.
@@ -995,8 +998,8 @@ class wght_avg_netCDF(out_func):
             # return the parser to the map so it can be used elsewhere
             map['parser'] = p
             if verbose:
-                print('Done processing %s at %s' %
-                      (p.name, str(datetime.datetime.now())))
+                print(('Done processing %s at %s' %
+                      (p.name, str(datetime.datetime.now()))))
             
         # done looping over maps
                 
@@ -1033,7 +1036,7 @@ class wght_avg_netCDF(out_func):
             extraDimSizes = self.parmDict['dimSizes'][field]
             extraDimLabels = self.parmDict['dimLabels'][field]
             for (size, label) in zip(extraDimSizes, extraDimLabels):
-                if label not in outFid.dimensions.keys():
+                if label not in list(outFid.dimensions.keys()):
                     outFid.createDimension(label, size)
                 
             # write the variable to file
@@ -1051,7 +1054,7 @@ class wght_avg_netCDF(out_func):
         # create an output dictionary keyed to output field names
 
         finalOutArrays = dict()
-        for (k,v) in outputArrays.iteritems():
+        for (k,v) in outputArrays.items():
             finalOutArrays[self.parmDict['outFieldNames'][k]] = v
         return finalOutArrays 
             
@@ -1273,7 +1276,7 @@ class unweighted_filtered_MOPITT_avg_netCDF_out_func(wght_avg_netCDF):
                     'solZenAngCutoff':float, 'solZenAng':str,
                     'dayTime':bool, 'surfTypeField':str,
                     'colMeasField':str}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             try:
                 parmDict[k] = func(parmDict[k])
             except TypeError:
@@ -1281,7 +1284,7 @@ class unweighted_filtered_MOPITT_avg_netCDF_out_func(wght_avg_netCDF):
                 
         # by this point times are already converted to TAI93 standard
         # no need to convert here
-        parmDict['timeConv'] = lambda(x):x
+        parmDict['timeConv'] = lambda x:x
         
         # remove extraneous entries in parmDict.  They will be incorporated in
         # weighting and filtering functions
@@ -1334,7 +1337,7 @@ class unweighted_filtered_MOPITT_avg_netCDF_out_func(wght_avg_netCDF):
             uniques = numpy.unique(sTypes)
             uniqueFracs = [float((sTypes == un).sum())/sTypes.size for un in uniques]
             cellType = None
-            for (type,frac) in izip(uniques,uniqueFracs):
+            for (type,frac) in zip(uniques,uniqueFracs):
                 # at most one value can meet threshold
                 if frac >= .75:
                     cellType = type
@@ -1351,7 +1354,7 @@ class unweighted_filtered_MOPITT_avg_netCDF_out_func(wght_avg_netCDF):
             uniqueNvals = set(nValidInCol)
             uniqueCounts = numpy.array([(nValidInCol == val).sum() for val in uniqueNvals])
             maxCount = uniqueCounts.max()
-            maxNVals = [nv for (nv,c) in izip(uniqueNvals,uniqueCounts) if c == maxCount]
+            maxNVals = [nv for (nv,c) in zip(uniqueNvals,uniqueCounts) if c == maxCount]
             # if there are multiples with same count, we want the highest number of valid
             # values, so we take the largest
             maxNVal = max(maxNVals)
@@ -1457,7 +1460,7 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
                   'timeStart':tai93conv, 'timeStop':tai93conv,
                   'timeComparison':str, 'fillVal':float, 
                   'includePixelCount':boolCaster}
-      for (k,func) in castDict.items():
+      for (k,func) in list(castDict.items()):
          try:
             self.parmDict[k] = func(self.parmDict[k])
          except TypeError:
@@ -1465,7 +1468,7 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
    
       # by this point times are already converted to TAI93 standard
       # no need to convert here
-      self.parmDict['timeConv'] = lambda(x):x
+      self.parmDict['timeConv'] = lambda x:x
 
       # create Weighting function
       def wghtFunc(parser, index, prevWght):
@@ -1532,19 +1535,19 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
          # open up context manager
          with map.pop('parser') as parser: # remove parser for looping
             if verbose:
-               print('\nProcessing {0} for output at {1}.'.format(\
-                      parser.name, str(datetime.datetime.now())))
+               print(('\nProcessing {0} for output at {1}.'.format(\
+                      parser.name, str(datetime.datetime.now()))))
                sys.stdout.write('\nData added from 0 pixels. ')
                sys.stdout.flush()
             # loop over gridboxes in map and calculate weights
-            for (gridCell, pixTup) in map.iteritems():
+            # counter = 0
+            for (gridCell, pixTup) in map.items():
                # translate gridCell to account for possible non-zero ll corner
                gridRow = gridCell[0]
                gridCol = gridCell[1]
                gridInd = (gridRow - minRow, gridCol - minCol)
                # get the values needed to calculate weight
                for (pxInd, unused_weight) in pixTup:
-
 
                   # check quality flags 
                   # and continue if pixel fails to meet requirements
@@ -1557,10 +1560,12 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
                      if QAO_flag % 2 != 1:
                         continue
                   '''
-
                   # check time within start/stop range
                   ###
-                  time = parser.get_cm(self.parmDict['time'], pxInd)
+                #   print(" we are here in out_geo.py parmDict time")
+                #   print(self.parmDict['time'])
+                #   print("indices", numpy.asarray(pxInd).astype(int))
+                  time = parser.get_cm(self.parmDict['time'], numpy.asarray(pxInd).astype(int))
                   if self.parmDict['timeComparison'] == 'local':
                      pixLon = parser.get_cm(self.parmDict['longitude'], pxInd)
                      offset = utils.UTCoffset_from_lon(pixLon)
@@ -1574,10 +1579,10 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
                   rawDataDict = {}
                   try:
                      for field in self.parmDict['inFieldNames']:
-                        rawData = parser.get_cm(field, pxInd)
+                        rawData = parser.get_cm(field, numpy.asarray(pxInd).astype(int))
                         rawDataDict[field] = rawData
                      if all(numpy.isnan(el).all()\
-                                    for el in rawDataDict.values()):
+                                    for el in list(rawDataDict.values())):
                         raise invalidPixCeption
                   except invalidPixCeption:
                      nNaNPixels[gridInd] += 1
@@ -1605,7 +1610,7 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
       avgs = dict()
       with warnings.catch_warnings():
          warnings.simplefilter("ignore")
-         for (field,var) in sumVars.iteritems():
+         for (field,var) in sumVars.items():
             unfiltAvgs = var/sumWght
             filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, self.parmDict['fillVal'])
             # strip trailing singlet for 2D arrays
@@ -1616,14 +1621,14 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
       numpy.seterr(divide=oldSettings['divide'])
      
       if verbose:
-          print "\nWriting final output to file at {0}.".format(\
-                                  str(datetime.datetime.now()))
+          print("\nWriting final output to file at {0}.".format(\
+                                  str(datetime.datetime.now())))
       # associate coindexed parameters into dicts keyed on inFieldnames
       # so we can loop by field
       ###
-      outFnames = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
-      units = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
-      extraDim = dict(izip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabels']))
+      outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+      units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+      extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabels']))
 
       # write out results to a netcdf file
       ###
@@ -1642,7 +1647,7 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
       setattr(outFid, 'Input_files', ' '.join([map['parser'].name for map in maps]))
       setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
 
-      for(k,v) in griddef.parms.iteritems():
+      for(k,v) in griddef.parms.items():
          setattr(outFid, k, v)
       # loop over fields and write variables
       ###
@@ -1655,7 +1660,7 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
             # has extra dim
             dimName = extraDim[field][0]
             dimSize = avgs[field].shape[2]
-            if dimName not in outFid.dimensions.keys():
+            if dimName not in list(outFid.dimensions.keys()):
                outFid.createDimension(dimName, dimSize)
             varDims = ('row', 'col', dimName)
   
@@ -1682,9 +1687,10 @@ class MODIS_simp_avg_netCDF_out_func(wght_avg_netCDF):
       # create a dict with the same data as avgs, but diff names
       ###
       outAvg = dict()
-      for (k,v) in avgs.iteritems():
+      for (k,v) in avgs.items():
          outAvg[outFnames[k]] = v
       return outAvg
+
 class OMIHCHO_netCDF_avg_out_func(out_func):
     '''
     Weighted average for a given set of filtered values
@@ -1913,8 +1919,8 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
             try:
                 dimsizes[i] = int(dimsizes[i])
             except ValueError:
-                print ("Warning: {0} is not a valid extraDimSize value.  " \
-                      "Using 0 instead").format(dimsizes[i])
+                print(("Warning: {0} is not a valid extraDimSize value.  " \
+                      "Using 0 instead").format(dimsizes[i]))
                 dimsizes[i] = 0
                 continue
         self.parmDict['extraDimSize'] = dimsizes
@@ -1931,7 +1937,7 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
                     'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
                     'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
                     'fillVal':float, 'includePixelCount':boolCaster}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             try:
                 self.parmDict[k] = func(self.parmDict[k])
             except TypeError:
@@ -1973,11 +1979,11 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
             # open up context manager
             with map.pop('parser') as parser: # remove parser for looping
                 if verbose:
-                    print('Processing {0} for output at {1}.'.format(\
-                            parser.name, str(datetime.datetime.now())))
+                    print(('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now()))))
 
                 # loop over gridboxes in map and calculate weights
-                for (gridCell, pixTup) in map.iteritems():
+                for (gridCell, pixTup) in map.items():
                     # translate gridCell to account 
                     # for possible non-zero ll corner
                     gridRow = gridCell[0]
@@ -2056,7 +2062,7 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
         avgs = dict()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            for (field,var) in sumVars.iteritems():
+            for (field,var) in sumVars.items():
                 unfiltAvgs = var/sumWght
                 filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, \
                            self.parmDict['fillVal'])
@@ -2070,9 +2076,9 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
         
         # associate coindexed parameters into dicts 
         # so we can loop by field
-        outFnames = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
-        units = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
-        extraDim = dict(izip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+        outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
                 
         # write out results to a netcdf file
         outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
@@ -2089,7 +2095,7 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
         fileListStr = ' '.join([map['parser'].name for map in maps])
         setattr(outFid, 'Input_files', fileListStr)
         setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
-        for (k,v) in griddef.parms.iteritems():
+        for (k,v) in griddef.parms.items():
             setattr(outFid, k, v)
         # loop over fields and write variables
         for field in self.parmDict['inFieldNames']:
@@ -2102,7 +2108,7 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
                 # has extra dim
                 dimName = extraDim[field]
                 dimSize = avgs[field].shape[2]
-                if dimName not in outFid.dimensions.keys():
+                if dimName not in list(outFid.dimensions.keys()):
                     outFid.createDimension(dimName, dimSize)
                 varDims = ('row', 'col', dimName)
             # create and assign value to variable
@@ -2119,7 +2125,7 @@ class OMIHCHO_netCDF_avg_out_func(out_func):
         outFid.close()
         # create a dict with the same data as avgs, but diff names
         outAvg = dict()
-        for (k,v) in avgs.iteritems():
+        for (k,v) in avgs.items():
             outAvg[outFnames[k]] = v
         if self.parmDict['includePixelCount']:
             outAvg['ValidPixelCount'] = nValidPixels
@@ -2349,8 +2355,8 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
             try:
                 dimsizes[i] = int(dimsizes[i])
             except ValueError:
-                print ("Warning: {0} is not a valid extraDimSize value.  " \
-                      "Using 0 instead").format(dimsizes[i])
+                print(("Warning: {0} is not a valid extraDimSize value.  " \
+                      "Using 0 instead").format(dimsizes[i]))
                 dimsizes[i] = 0
                 continue
         self.parmDict['extraDimSize'] = dimsizes
@@ -2367,7 +2373,7 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
                     'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
                     'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
                     'fillVal':float, 'includePixelCount':boolCaster}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             try:
                 self.parmDict[k] = func(self.parmDict[k])
             except TypeError:
@@ -2400,6 +2406,8 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
             else:
                 # pad with a singlet dim if it was 2D
                 sumVars[field] = numpy.zeros((nRows, nCols, 1))
+                print(field)
+                print(sumVars[field].shape)
         
         # loop over maps
         if not isinstance(maps, list):
@@ -2409,11 +2417,11 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
             # open up context manager
             with map.pop('parser') as parser: # remove parser for looping
                 if verbose:
-                    print('Processing {0} for output at {1}.'.format(\
-                            parser.name, str(datetime.datetime.now())))
+                    print(('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now()))))
 
                 # loop over gridboxes in map and calculate weights
-                for (gridCell, pixTup) in map.iteritems():
+                for (gridCell, pixTup) in map.items():
                     # translate gridCell to account 
                     # for possible non-zero ll corner
                     gridRow = gridCell[0]
@@ -2426,7 +2434,10 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
                                   self.parmDict['overallQualFlag'], pxInd)
                         cFrac = parser.get_cm(\
                                 self.parmDict['cloudFrac'], pxInd)                                  
+                        #print('check1')
                         if sumFlag % 2:
+                            #print("check2")
+                            #print(sumFlag)
                             continue
                         # check cloud fraction flag
                         xtrackFlag = parser.get_cm(\
@@ -2475,8 +2486,14 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
                         # add the weight to the total for this cell 
                         sumWght[gridInd] += weight
                         for field in self.parmDict['inFieldNames']:
+                            #print(field)
                             weightVals = rawDataDict[field] * weight
                             if weightVals.size > 1:
+                                #print("check")
+                                #print(sumVars[field][gridInd].shape)
+                                #print(sumVars[field][gridInd])
+                                #print(weightVals)
+                                #print(numpy.array([sumVars[field][gridInd], weightVals]).shape)
                                 sumVars[field][gridInd] = \
                                      numpy.nansum([sumVars[field][gridInd],\
                                                    weightVals], axis=0)        
@@ -2491,7 +2508,7 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
         avgs = dict()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            for (field,var) in sumVars.iteritems():
+            for (field,var) in sumVars.items():
                 unfiltAvgs = var/sumWght
                 filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, \
                            self.parmDict['fillVal'])
@@ -2505,9 +2522,9 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
         
         # associate coindexed parameters into dicts 
         # so we can loop by field
-        outFnames = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
-        units = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
-        extraDim = dict(izip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+        outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
                 
         # write out results to a netcdf file
         outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
@@ -2524,7 +2541,7 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
         fileListStr = ' '.join([map['parser'].name for map in maps])
         setattr(outFid, 'Input_files', fileListStr)
         setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
-        for (k,v) in griddef.parms.iteritems():
+        for (k,v) in griddef.parms.items():
             setattr(outFid, k, v)
         # loop over fields and write variables
         for field in self.parmDict['inFieldNames']:
@@ -2537,7 +2554,7 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
                 # has extra dim
                 dimName = extraDim[field]
                 dimSize = avgs[field].shape[2]
-                if dimName not in outFid.dimensions.keys():
+                if dimName not in list(outFid.dimensions.keys()):
                     outFid.createDimension(dimName, dimSize)
                 varDims = ('row', 'col', dimName)
             # create and assign value to variable
@@ -2554,7 +2571,7 @@ class OMNO2e_netCDF_avg_v3_out_func(out_func):
         outFid.close()
         # create a dict with the same data as avgs, but diff names
         outAvg = dict()
-        for (k,v) in avgs.iteritems():
+        for (k,v) in avgs.items():
             outAvg[outFnames[k]] = v
         if self.parmDict['includePixelCount']:
             outAvg['ValidPixelCount'] = nValidPixels
@@ -2788,8 +2805,8 @@ class OMISO2_netCDF_avg_out_func(out_func):
             try:
                 dimsizes[i] = int(dimsizes[i])
             except ValueError:
-                print ("Warning: {0} is not a valid extraDimSize value.  " \
-                      "Using 0 instead").format(dimsizes[i])
+                print(("Warning: {0} is not a valid extraDimSize value.  " \
+                      "Using 0 instead").format(dimsizes[i]))
                 dimsizes[i] = 0
                 continue
         self.parmDict['extraDimSize'] = dimsizes
@@ -2806,7 +2823,7 @@ class OMISO2_netCDF_avg_out_func(out_func):
                     'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
                     'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
                     'fillVal':float, 'includePixelCount':boolCaster}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             try:
                 self.parmDict[k] = func(self.parmDict[k])
             except TypeError:
@@ -2848,13 +2865,15 @@ class OMISO2_netCDF_avg_out_func(out_func):
             # open up context manager
             with map.pop('parser') as parser: # remove parser for looping
                 if verbose:
-                    print('Processing {0} for output at {1}.'.format(\
-                            parser.name, str(datetime.datetime.now())))
+                    print(('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now()))))
+                print(map.items())
 		
                 # loop over gridboxes in map and calculate weights
-                for (gridCell, pixTup) in map.iteritems():
+                for (gridCell, pixTup) in map.items():
 		    # translate gridCell to account 
                     # for possible non-zero ll corner
+                    print(gridCell)
                     gridRow = gridCell[0]
                     gridCol = gridCell[1]
                     gridInd = (gridRow - minRow, gridCol - minCol)
@@ -2931,7 +2950,7 @@ class OMISO2_netCDF_avg_out_func(out_func):
         avgs = dict()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            for (field,var) in sumVars.iteritems():
+            for (field,var) in sumVars.items():
                 unfiltAvgs = var/sumWght
                 filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, \
                            self.parmDict['fillVal'])
@@ -2945,9 +2964,9 @@ class OMISO2_netCDF_avg_out_func(out_func):
         
         # associate coindexed parameters into dicts 
         # so we can loop by field
-        outFnames = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
-        units = dict(izip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
-        extraDim = dict(izip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+        outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
                 
         # write out results to a netcdf file
         outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
@@ -2964,7 +2983,7 @@ class OMISO2_netCDF_avg_out_func(out_func):
         fileListStr = ' '.join([map['parser'].name for map in maps])
         setattr(outFid, 'Input_files', fileListStr)
         setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
-        for (k,v) in griddef.parms.iteritems():
+        for (k,v) in griddef.parms.items():
             setattr(outFid, k, v)
         # loop over fields and write variables
         for field in self.parmDict['inFieldNames']:
@@ -2977,7 +2996,7 @@ class OMISO2_netCDF_avg_out_func(out_func):
                 # has extra dim
                 dimName = extraDim[field]
                 dimSize = avgs[field].shape[2]
-                if dimName not in outFid.dimensions.keys():
+                if dimName not in list(outFid.dimensions.keys()):
                     outFid.createDimension(dimName, dimSize)
                 varDims = ('row', 'col', dimName)
             # create and assign value to variable
@@ -2994,7 +3013,1096 @@ class OMISO2_netCDF_avg_out_func(out_func):
         outFid.close()
         # create a dict with the same data as avgs, but diff names
         outAvg = dict()
-        for (k,v) in avgs.iteritems():
+        for (k,v) in avgs.items():
+            outAvg[outFnames[k]] = v
+        if self.parmDict['includePixelCount']:
+            outAvg['ValidPixelCount'] = nValidPixels
+        return outAvg
+
+# Author: Eliot Kim
+# Start Date: 8-5-2020
+class qa4ecv_OMIHCHO_netCDF_avg_out_func(out_func):
+
+    @staticmethod
+    def parm_list():
+        return ["overallQualFlag", "cloudFrac", "solarZenithAngle", "time", "longitude",
+                "inFieldNames", "outFieldNames", "outUnits", "extraDimLabel", "extraDimSize",
+                "timeComparison", "timeStart", "timeStop", "cloudFractUpperCutoff",
+                "solarZenAngUpperCutoff", "pixIndXtrackAxis", "fillVal", "includePixelCount"]
+
+    @staticmethod
+    def required_parms():
+        return {'overallQualFlag' : ('The name of the field containing ' \
+                                     'the overall quality flag for the ' \
+                                     'pixels.  This flag should be true (1) ' \
+                                     'for invalid pixels and false (0) for ' \
+                                     'valid pixels.\n{ OMI KNMI - Tropo' \
+                                     'sphericColumnFlag\n  OMI NASA - vcd' \
+                                     'QualityFlags \n OMI QA4ECV - processing_error_flag }',None),
+                'cloudFrac' : ('The name of the field containing the ' \
+                               'cloud fractions\n{ OMI KNMI - CloudFraction' \
+                               '\n  OMI NASA - CloudFraction \n OMI QA4ECV - cloud_fraction }',None),
+                'solarZenithAngle' : ('The name of the field containing the '\
+                                      'solar zenith angles in degrees.\n{ ' \
+                                      'OMI KNMI - SolarZenithAngle\n  OMI ' \
+                                      'NASA - SolarZenithAngle \n OMI QA4ECV - solar_zenith_angle }',None),
+                'time' : ('The name of the field containing the timestamps. '\
+                          ' Timestamps are assumed to be the in TAI-93 (UTC for OMI QA4ECV)' \
+                          'format.\n{ OMI KNMI - Time\n  OMI NASA - TIME \n OMI QA4ECV - time_utc }', \
+                          None),
+                'longitude' : ('The name of the field containing longitudes ' \
+                               'at cell centers.  Longitudes should be in ' \
+                               'degrees east.\n{ OMI KNMI - Longitude\n  ' \
+                               'OMI NASA - Longitude \n OMI QA4ECV - longitude }',None),
+                'inFieldNames' : ('The names of the fields desired to be ' \
+                                  'output.  Input as comma-delimited list ', \
+                                  'list'),
+                'outFieldNames' : ('The names of the output variables (even ' \
+                                   'if they are to be the same as the input ' \
+                                   'variables).  Should be a comma-delimited ' \
+                                   'list co-indexed to inFieldNames','list'),
+                'outUnits' : ('The units of the variables to be written out. ' \
+                              'Should be a comma-delimited list co-indexed ' \
+                              'to inFieldNames','list'),
+                'extraDimLabel' : ('The label for the extra dimension '  \
+                                   '(should the variable have an extra ' \
+                                   'dimension).  Ignored in the case of a ' \
+                                   '2D variable.  Should be a comma-delimited '\
+                                   'list co-indexed to inFieldNames','list'),
+                'extraDimSize' : ('The size of the extra dimensions (should ' \
+                                  'the variable have an extra dimension).  ' \
+                                  'For 2D variables, must be set to 0. (zero)' \
+                                  '  Should be a comma-delimited list ' \
+                                  'co-indexed to inFieldNames.','list'),
+                'timeComparison' : ('Must be set to either "local" or "UTC". ' \
+                                    ' Determines how the file timestamps are ' \
+                                    'compared to the start/stop time.  If set '\
+                                    'to "local", then the file timestamps are '\
+                                    'converted to local time on a pixel-by-'\
+                                    'pixel basis (using longitude to estimate '\
+                                    'time zone) before being compared to time '\
+                                    'boundaries.  If set to "UTC" the file ' \
+                                    'timestamps (which are assumed to be in ' \
+                                    'UTC) are compared against the start/stop '\
+                                    'time directly.',None),
+                'timeStart' : ('The earliest time for which data should be ' \
+                               'recorded into the output file.  All times in ' \
+                               'input files before this time will be filtered '\
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'timeStop' : ('The latest time for which data should be ' \
+                               'recorded into the output files.  All times in '\
+                               'input files after this time will be filtered ' \
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'cloudFractUpperCutoff' : ('The maximum cloud fraction to ' \
+                                           'allow before excluding pixel from '\
+                                           'average.  Suggested value from ' \
+                                           'NASA is 0.3','decimal'),
+                'solarZenAngUpperCutoff' : ('The maximum solar zenith angle to'\
+                                            ' allow before excluding pixel ' \
+                                            'from average, in degrees.  ' \
+                                            'Suggested value from NASA is 85.',\
+                                            'int'),
+                'pixIndXtrackAxis' : ('The dimension order (0 based) of the ' \
+                                      '"cross-track" dimension (whichever ' \
+                                      'dimension has size 60).  For all ' \
+                                      'currently known cases set equal to 1 ' \
+                                      '(depends on the construction of the ' \
+                                      'parser function.  If you rewrite the ' \
+                                      'parser, check this).','int'),
+                'fillVal' : ('The value to use as a fill value in the output ' \
+                             'netCDF file.  This value will replace any missing '\
+                             'or invalid output values','decimal'),
+                'includePixelCount' : ('If set to true, the output will include '\
+                                       'a field "ValidPixelCount" that contains '\
+                                       'the number of valid pixels in each grid '\
+                                       'cell.  Only pixels with nonzero weight  '\
+                                       'are considered valid.', 'bool')}
+
+    __userKeys__ = "inFieldNames"
+
+    def __call__(self, maps, griddef, outfilename, verbose, version):
+        '''Write out a weighted-average file in netcdf format.'''
+        #Make sure non-string parameters are in the correct format
+        dimsizes = self.parmDict['extraDimSize']
+        for i in range(len(dimsizes)):
+            try:
+                dimsizes[i] = int(dimsizes[i])
+            except ValueError:
+                print("Warning: {dimsizes[i]} is not a valid extraDimSize value.  " \
+                      "Using 0 instead")
+                dimsizes[i] = 0
+                continue
+        self.parmDict['extraDimSize'] = dimsizes
+
+        # even though IO interface handles casting already,
+        # a catchblock has been added here for safety
+        # in case someone wants to use this class directly
+        castDict = {'overallQualFlag':str, 'cloudFrac':str,
+                    'solarZenithAngle':str, 'time':str,
+                    'longitude':str, 'inFieldNames':list,
+                    'outFieldNames':list, 'outUnits':list,
+                    'extraDimLabel':list, 'extraDimSize':list,
+                    'timeComparison':str,'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
+                    'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
+                    'fillVal':float, 'includePixelCount':boolCaster}
+        for (k,func) in list(castDict.items()):
+            try:
+                self.parmDict[k] = func(self.parmDict[k])
+            except TypeError:
+                pass
+
+        #Perform some basic sanity checks with parameters
+        if self.parmDict['timeStart'] > self.parmDict['timeStop']:
+            msg = 'Input start time must come before stop time.'
+            raise IOError(msg)
+        if (len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outFieldNames']) or
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outUnits']) or
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['extraDimLabel'])):
+            msg = 'All field/unit inputs ' + \
+                'should have the same number of elements.'
+            raise IOError(msg)
+        # create numpy arrays to hold our data
+        (minRow, maxRow, minCol, maxCol) = griddef.indLims()
+        nRows = maxRow - minRow + 1
+        nCols = maxCol - minCol + 1
+        nValidPixels = numpy.zeros((nRows, nCols))
+        sumWght = numpy.zeros((nRows, nCols, 1, 1))  # needs extra dim to generalize for 3D vars
+        sumVars = dict()
+        for field, size in zip(self.parmDict['inFieldNames'], self.parmDict['extraDimSize']):
+            if field == "tm5_pressure_level_a" or field == "tm5_pressure_level_b":
+                sumVars[field] = numpy.zeros((nRows, nCols, size, 2))
+            elif size:
+                sumVars[field] = numpy.zeros((nRows, nCols, size, 1))
+            else:
+                # pad with a singlet dim if it was 2D
+                sumVars[field] = numpy.zeros((nRows, nCols, 1, 1))
+
+        # loop over maps
+        if not isinstance(maps, list):
+            maps = [maps] # create list if we only got a single map
+
+        for map in maps:
+            # open up context manager
+            with map.pop('parser') as parser: # remove parser for looping
+                if verbose:
+                    print(('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now()))))
+                counter = 0
+                # loop over gridboxes in map and calculate weights
+                for (gridCell, pixTup) in map.items():
+                    # translate gridCell to account 
+                    # for possible non-zero ll corner
+                    gridRow = gridCell[0]
+                    gridCol = gridCell[1]
+                    gridInd = (gridRow - minRow, gridCol - minCol)
+                    # print(gridInd)
+                    # get the values needed to calculate weight
+                    for (pxInd, unused_weight) in pixTup:
+                        # check summary flag
+                        sumFlag = parser.get_cm(self.parmDict['overallQualFlag'], pxInd)
+                        cFrac = parser.get_cm(self.parmDict['cloudFrac'], pxInd)
+                        # print(sumFlag, cFrac, pxInd)
+                        # print("first output check: ", pxInd, sumFlag)                        
+                        if sumFlag % 2:
+                            continue
+                        # check cloud fraction flag
+
+                        if not (cFrac <= self.parmDict[\
+                                              'cloudFractUpperCutoff']):
+                            continue
+                        # check solar zenith angle flag
+                        solZenAng = parser.get_cm(\
+                                   self.parmDict['solarZenithAngle'], pxInd)
+                        if solZenAng > self.parmDict[\
+                                              'solarZenAngUpperCutoff']:
+                            continue
+                        # check time flag
+                        time = parser.get_cm(self.parmDict['time'], pxInd)[:-8]
+                        time = utils.utc_to_nsecs(time)
+                        # calculate and factor in offset 
+                        # if the user wanted us to
+                        if self.parmDict['timeComparison'] == 'local':
+                            pixLon = parser.get_cm(\
+                                         self.parmDict['longitude'], pxInd)
+                            offset = utils.UTCoffset_from_lon(pixLon)
+                            time += offset
+                        if time < self.parmDict['timeStart'] \
+                               or time > self.parmDict['timeStop']:
+                            # print(time, self.parmDict['timeStart'], self.parmDict['timeStop'])
+                            continue
+                        # read in all the data 
+                        # abandon ship if data is all NaN
+                        rawDataDict = {}
+                        try:
+                            for field in self.parmDict['inFieldNames']:
+                                rawData = parser.get_cm(field, pxInd)
+                                if field == "time_utc":
+                                    rawData = utils.utc_to_nsecs(rawData[:-8])
+                                if numpy.isnan(rawData).all():
+                                    raise invalidPixCeption
+                                rawDataDict[field] = rawData
+                        except invalidPixCeption:
+                            continue
+                        # compute the weight
+                        fov = pxInd[self.parmDict['pixIndXtrackAxis']]
+                        weight = _OMNO2e_formula(cFrac, fov)
+                        assert weight != numpy.NaN
+                        if weight > 0:
+                            nValidPixels[gridInd] += 1
+
+                        # add the weight to the total for this cell 
+                        sumWght[gridInd] += weight
+                        for field in self.parmDict['inFieldNames']:
+                            # print("Initial data: ", field, rawDataDict[field], sumVars[field][gridInd])
+                            weightVals = rawDataDict[field] * weight
+                            if weightVals.size > 1:
+                                if (sumVars[field][gridInd].shape[-1] == 1):
+                                    # print("inputs 1: ", [sumVars[field][gridInd].reshape(sumVars[field][gridInd].shape[0]), weightVals])
+                                    # print("outputs 1: ", numpy.nansum([sumVars[field][gridInd].reshape(sumVars[field][gridInd].shape[0]),\
+                                    #                 weightVals], axis=0))
+                                    temp = numpy.nansum([sumVars[field][gridInd].reshape(sumVars[field][gridInd].shape[0]),\
+                                                    weightVals], axis=0)
+                                    sumVars[field][gridInd] = temp[..., numpy.newaxis]
+
+                                else:
+                                    # print("inputs 2: ", [sumVars[field][gridInd], weightVals])
+                                    # print("outputs 2: ", numpy.nansum([sumVars[field][gridInd],\
+                                    #                 weightVals], axis=0))
+                                    sumVars[field][gridInd] = \
+                                        numpy.nansum([sumVars[field][gridInd],\
+                                                    weightVals], axis=0)
+                            else:
+                                # print("inputs 3: ", sumVars[field][gridInd][0], weightVals)
+                                # print("outputs 3: ", numpy.nansum([sumVars[field][gridInd][0],\
+                                #                    weightVals]))
+                                sumVars[field][gridInd] = \
+                                     numpy.nansum([sumVars[field][gridInd][0],\
+                                                   weightVals])
+                    counter += 1
+                    print(counter)
+                map['parser'] = parser  # return parser to map
+
+        # divide out variables by weights to get avgs. 
+        oldSettings = numpy.seterr(divide='ignore')
+        avgs = dict()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for (field,var) in sumVars.items():
+                unfiltAvgs = var/sumWght
+                filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, \
+                           self.parmDict['fillVal'])
+                # strip trailing singlet for 2D arrays
+                if filtAvgs.shape[-2] == 1:
+                    avgs[field] = filtAvgs.reshape(filtAvgs.shape[0:2])
+                elif filtAvgs.shape[-1] == 1:
+                    avgs[field] = filtAvgs.reshape(filtAvgs.shape[0:3])
+                else:
+                    avgs[field] = filtAvgs
+        numpy.seterr(divide=oldSettings['divide'])
+
+
+        # associate coindexed parameters into dicts 
+        # so we can loop by field
+        outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+
+        # write out results to a netcdf file
+        outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
+        # create the 2 dimensions all files use
+        outFid.createDimension('row', nRows)
+        outFid.createDimension('col', nCols)
+        # write global attributes
+        setattr(outFid, 'Version', vsnmsg(version))
+        setattr(outFid, 'File_start_time', utils.nsecs_to_timestr(self.parmDict['timeStart'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'File_end_time', utils.nsecs_to_timestr(self.parmDict['timeStop'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'Max_valid_cloud_fraction', self.parmDict['cloudFractUpperCutoff'])
+        setattr(outFid, 'Max_valid_solar_zenith_angle', self.parmDict['solarZenAngUpperCutoff'])
+        setattr(outFid, 'Time_comparison_scheme', self.parmDict['timeComparison'])
+        fileListStr = ' '.join([map['parser'].name for map in maps])
+        setattr(outFid, 'Input_files', fileListStr)
+        setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
+        for (k,v) in griddef.parms.items():
+            setattr(outFid, k, v)
+        # loop over fields and write variables
+        for field in self.parmDict['inFieldNames']:
+            print(field, avgs[field].shape)
+            # create tuple of dimensions, defining new dim
+            # if necessary
+            if len(avgs[field].shape) == 2:
+                # only row/cols
+                varDims = ('row', 'col')
+            elif len(avgs[field].shape) == 3:
+                # has extra dim
+                dimName = extraDim[field]
+                dimSize = avgs[field].shape[2]
+                if dimName not in list(outFid.dimensions.keys()):
+                    outFid.createDimension(dimName, dimSize)
+                varDims = ('row', 'col', dimName)
+            elif len(avgs[field].shape) == 4:
+                # has extra two dims
+                dimName = extraDim[field]
+                dimSize = avgs[field].shape[2]
+                if dimName not in list(outFid.dimensions.keys()):
+                    outFid.createDimension(dimName, dimSize)
+                if "extra_tm5_pressure_level_dim" not in list(outFid.dimensions.keys()):
+                    outFid.createDimension("extra_tm5_pressure_level_dim", 2)
+                varDims = ("row", "col", dimName, "extra_tm5_pressure_level_dim")
+            # create and assign value to varisable
+            varHandle = outFid.createVariable(outFnames[field], 'd', varDims, fill_value=self.parmDict['fillVal'])
+            print(varHandle)
+            varHandle[:] = avgs[field]
+            # assign variable attributes
+            setattr(varHandle, 'Units', units[field])
+        # Write out the pixel counts if the user requested them
+        if self.parmDict['includePixelCount']:
+            varDims = ('row', 'col')
+            varHandle = outFid.createVariable('ValidPixelCount', 'i', varDims,
+                                              fill_value=self.parmDict['fillVal'])
+            varHandle[:] = nValidPixels
+        outFid.close()
+        # create a dict with the same data as avgs, but with user-specified output file names
+        outAvg = dict()
+        for (k,v) in avgs.items():
+            outAvg[outFnames[k]] = v
+        if self.parmDict['includePixelCount']:
+            outAvg['ValidPixelCount'] = nValidPixels
+        return outAvg
+
+# Author: Eliot Kim
+# Start Date: 9/21/2020
+class tropomi_no2_netCDF_avg_out_func(out_func):
+
+    @staticmethod
+    def parm_list():
+        return ["overallQualFlag", "cloudFrac", "solarZenithAngle", "time", "longitude",
+                "inFieldNames", "outFieldNames", "outUnits", "extraDimLabel", "extraDimSize",
+                "timeComparison", "timeStart", "timeStop", "cloudFractUpperCutoff",
+                "solarZenAngUpperCutoff", "pixIndXtrackAxis", "fillVal", "includePixelCount"]
+
+    @staticmethod
+    def required_parms():
+        return {'overallQualFlag' : ('The name of the field containing ' \
+                                     'the overall quality flag for the ' \
+                                     'pixels.  This flag should be true (1) ' \
+                                     'for invalid pixels and false (0) for ' \
+                                     'valid pixels.\n{ OMI KNMI - Tropo' \
+                                     'sphericColumnFlag\n  OMI NASA - vcd' \
+                                     'QualityFlags \n OMI QA4ECV - processing_error_flag' \
+                                     '\n TROPOMI NO2 - qa_value}',None),
+                'cloudFrac' : ('The name of the field containing the ' \
+                               'cloud fractions\n{ OMI KNMI - CloudFraction' \
+                               '\n  OMI NASA - CloudFraction \n OMI QA4ECV - cloud_fraction' \
+                               '\n TROPOMI NO2 - cloud_fraction}',None),
+                'solarZenithAngle' : ('The name of the field containing the '\
+                                      'solar zenith angles in degrees.\n{ ' \
+                                      'OMI KNMI - SolarZenithAngle\n  OMI ' \
+                                      'NASA - SolarZenithAngle \n OMI QA4ECV - solar_zenith_angle' \
+                                      '\n TROPOMI NO2}',None),
+                'time' : ('The name of the field containing the timestamps. '\
+                          ' Timestamps are assumed to be the in TAI-93 (UTC for OMI QA4ECV)' \
+                          'format.\n{ OMI KNMI - Time\n  OMI NASA - TIME \n OMI QA4ECV - time_utc' \
+                          '\n TROPOMI NO2 - time_utc}', \
+                          None),
+                'longitude' : ('The name of the field containing longitudes ' \
+                               'at cell centers.  Longitudes should be in ' \
+                               'degrees east.\n{ OMI KNMI - Longitude\n  ' \
+                               'OMI NASA - Longitude \n OMI QA4ECV - longitude' \
+                               '\n TROPOMI NO2 - longitude}',None),
+                'inFieldNames' : ('The names of the fields desired to be ' \
+                                  'output.  Input as comma-delimited list ', \
+                                  'list'),
+                'outFieldNames' : ('The names of the output variables (even ' \
+                                   'if they are to be the same as the input ' \
+                                   'variables).  Should be a comma-delimited ' \
+                                   'list co-indexed to inFieldNames','list'),
+                'outUnits' : ('The units of the variables to be written out. ' \
+                              'Should be a comma-delimited list co-indexed ' \
+                              'to inFieldNames','list'),
+                'extraDimLabel' : ('The label for the extra dimension '  \
+                                   '(should the variable have an extra ' \
+                                   'dimension).  Ignored in the case of a ' \
+                                   '2D variable.  Should be a comma-delimited '\
+                                   'list co-indexed to inFieldNames','list'),
+                'extraDimSize' : ('The size of the extra dimensions (should ' \
+                                  'the variable have an extra dimension).  ' \
+                                  'For 2D variables, must be set to 0. (zero)' \
+                                  '  Should be a comma-delimited list ' \
+                                  'co-indexed to inFieldNames.','list'),
+                'timeComparison' : ('Must be set to either "local" or "UTC". ' \
+                                    ' Determines how the file timestamps are ' \
+                                    'compared to the start/stop time.  If set '\
+                                    'to "local", then the file timestamps are '\
+                                    'converted to local time on a pixel-by-'\
+                                    'pixel basis (using longitude to estimate '\
+                                    'time zone) before being compared to time '\
+                                    'boundaries.  If set to "UTC" the file ' \
+                                    'timestamps (which are assumed to be in ' \
+                                    'UTC) are compared against the start/stop '\
+                                    'time directly.',None),
+                'timeStart' : ('The earliest time for which data should be ' \
+                               'recorded into the output file.  All times in ' \
+                               'input files before this time will be filtered '\
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'timeStop' : ('The latest time for which data should be ' \
+                               'recorded into the output files.  All times in '\
+                               'input files after this time will be filtered ' \
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'cloudFractUpperCutoff' : ('The maximum cloud fraction to ' \
+                                           'allow before excluding pixel from '\
+                                           'average.  Suggested value from ' \
+                                           'NASA is 0.3','decimal'),
+                'solarZenAngUpperCutoff' : ('The maximum solar zenith angle to'\
+                                            ' allow before excluding pixel ' \
+                                            'from average, in degrees.  ' \
+                                            'Suggested value from NASA is 85.',\
+                                            'int'),
+                'pixIndXtrackAxis' : ('The dimension order (0 based) of the ' \
+                                      '"cross-track" dimension (whichever ' \
+                                      'dimension has size 60).  For all ' \
+                                      'currently known cases set equal to 1 ' \
+                                      '(depends on the construction of the ' \
+                                      'parser function.  If you rewrite the ' \
+                                      'parser, check this).','int'),
+                'fillVal' : ('The value to use as a fill value in the output ' \
+                             'netCDF file.  This value will replace any missing '\
+                             'or invalid output values','decimal'),
+                'includePixelCount' : ('If set to true, the output will include '\
+                                       'a field "ValidPixelCount" that contains '\
+                                       'the number of valid pixels in each grid '\
+                                       'cell.  Only pixels with nonzero weight  '\
+                                       'are considered valid.', 'bool')}
+
+    __userKeys__ = "inFieldNames"
+
+    def __call__(self, maps, griddef, outfilename, verbose, version):
+        '''Write out a weighted-average file in netcdf format.'''
+        #Make sure non-string parameters are in the correct format
+        dimsizes = self.parmDict['extraDimSize']
+        for i in range(len(dimsizes)):
+            try:
+                dimsizes[i] = int(dimsizes[i])
+            except ValueError:
+                print(("Warning: {dimsizes[i]} is not a valid extraDimSize value.  " \
+                      "Using 0 instead").format(dimsizes[i]))
+                dimsizes[i] = 0
+                continue
+        self.parmDict['extraDimSize'] = dimsizes
+
+        # even though IO interface handles casting already,
+        # a catchblock has been added here for safety
+        # in case someone wants to use this class directly
+        castDict = {'overallQualFlag':str, 'cloudFrac':str,
+                    'solarZenithAngle':str, 'time':str,
+                    'longitude':str, 'inFieldNames':list,
+                    'outFieldNames':list, 'outUnits':list,
+                    'extraDimLabel':list, 'extraDimSize':list,
+                    'timeComparison':str,'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
+                    'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
+                    'fillVal':float, 'includePixelCount':boolCaster}
+        for (k,func) in list(castDict.items()):
+            try:
+                self.parmDict[k] = func(self.parmDict[k])
+            except TypeError:
+                pass
+
+        #Perform some basic sanity checks with parameters
+        if self.parmDict['timeStart'] > self.parmDict['timeStop']:
+            msg = 'Input start time must come before stop time.'
+            raise IOError(msg)
+        if (len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outFieldNames']) or
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outUnits']) or
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['extraDimLabel'])):
+            msg = 'All field/unit inputs ' + \
+                'should have the same number of elements.'
+            raise IOError(msg)
+
+        # create numpy arrays to hold our data
+        (minRow, maxRow, minCol, maxCol) = griddef.indLims()
+        nRows = maxRow - minRow + 1
+        nCols = maxCol - minCol + 1
+        nValidPixels = numpy.zeros((nRows, nCols))
+        sumWght = numpy.zeros((nRows, nCols, 1, 1))  # needs extra dim to generalize for 3D vars
+        sumVars = dict()
+        for field, size in zip(self.parmDict['inFieldNames'], self.parmDict['extraDimSize']):
+            if field == "tm5_pressure_level_a" or field == "tm5_pressure_level_b" or field == "tm5_constant_a" or field == "tm5_constant_b":
+                sumVars[field] = numpy.zeros((nRows, nCols, size, 2))
+            elif size:
+                sumVars[field] = numpy.zeros((nRows, nCols, size, 1))
+            else:
+                # pad with a singlet dim if it was 2D
+                sumVars[field] = numpy.zeros((nRows, nCols, 1, 1))
+
+        # loop over maps
+        if not isinstance(maps, list):
+            maps = [maps] # create list if we only got a single map
+
+        for map in maps:
+            # open up context manager
+            with map.pop('parser') as parser: # remove parser for looping
+                if verbose:
+                    print(('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now()))))
+                counter = 0
+                # loop over gridboxes in map and calculate weights
+                for (gridCell, pixTup) in map.items():
+                    # translate gridCell to account 
+                    # for possible non-zero ll corner
+                    gridRow = gridCell[0]
+                    gridCol = gridCell[1]
+                    gridInd = (gridRow - minRow, gridCol - minCol)
+                    # print(gridInd)
+                    # get the values needed to calculate weight
+                    for (pxInd, unused_weight) in pixTup:
+                        # check summary flag
+                        sumFlag = parser.get_cm(self.parmDict['overallQualFlag'], pxInd)
+                        cFrac = parser.get_cm(self.parmDict['cloudFrac'], pxInd)
+                        # print(sumFlag, cFrac, pxInd)
+                        # print("first output check: ", pxInd, sumFlag)                        
+                        if sumFlag < 0.75:
+                            continue
+                        # check cloud fraction flag
+
+                        if not (cFrac <= self.parmDict[\
+                                              'cloudFractUpperCutoff']):
+                            continue
+                        # check solar zenith angle flag
+                        solZenAng = parser.get_cm(\
+                                   self.parmDict['solarZenithAngle'], pxInd)
+                        if solZenAng > self.parmDict[\
+                                              'solarZenAngUpperCutoff']:
+                            continue
+                        # check time flag
+                        time = parser.get_cm(self.parmDict['time'], pxInd)[0][:-8]
+                        # time_test = time
+                        # print("out", time)
+                        time = utils.utc_to_nsecs(time)
+                        # print(time_test, time, self.parmDict['timeStart'], self.parmDict['timeStop'])
+                        # calculate and factor in offset 
+                        # if the user wanted us to
+                        if self.parmDict['timeComparison'] == 'local':
+                            pixLon = parser.get_cm(\
+                                         self.parmDict['longitude'], pxInd)
+                            offset = utils.UTCoffset_from_lon(pixLon)
+                            time += offset
+                        if time < self.parmDict['timeStart'] \
+                               or time > self.parmDict['timeStop']:
+                            # print(time, self.parmDict['timeStart'], self.parmDict['timeStop'])
+                            continue
+                        # read in all the data 
+                        # abandon ship if data is all NaN
+                        # print("checkpoint")
+                        rawDataDict = {}
+                        try:
+                            for field in self.parmDict['inFieldNames']:
+                                rawData = parser.get_cm(field, pxInd)
+                                if field == "time_utc":
+                                    rawData = utils.utc_to_nsecs(rawData[0][:-8])
+                                if numpy.isnan(rawData).all():
+                                    raise invalidPixCeption
+                                rawDataDict[field] = rawData
+                        except invalidPixCeption:
+                            continue
+                        # compute the weight
+                        fov = pxInd[self.parmDict['pixIndXtrackAxis']]
+                        weight = _OMNO2e_formula(cFrac, fov)
+                        assert weight != numpy.NaN
+                        if weight > 0:
+                            nValidPixels[gridInd] += 1
+
+                        # add the weight to the total for this cell 
+                        sumWght[gridInd] += weight
+                        for field in self.parmDict['inFieldNames']:
+                            # print("Initial data: ", field, rawDataDict[field], sumVars[field][gridInd])
+                            weightVals = rawDataDict[field] * weight
+                            if weightVals.size > 1:
+                                if (sumVars[field][gridInd].shape[-1] == 1):
+                                    var_values = sumVars[field][gridInd].reshape(sumVars[field][gridInd].shape[0])
+                                    # print("inputs 1: ", [var_values, weightVals])
+                                    # print("outputs 1: ", numpy.nansum([var_values, weightVals.reshape(-1)], axis=0))
+                                    # print("check")
+
+                                    # remove one dim from WeightVals to match var_values
+                                    temp = numpy.nansum([var_values, weightVals.reshape(-1)], axis=0)
+                                    sumVars[field][gridInd] = temp[..., numpy.newaxis]
+
+                                else:
+                                    # print("inputs 2: ", [sumVars[field][gridInd], weightVals])
+                                    # print("outputs 2: ", numpy.nansum([sumVars[field][gridInd], weightVals], axis=0))
+                                    sumVars[field][gridInd] = \
+                                        numpy.nansum([sumVars[field][gridInd],\
+                                                    weightVals], axis=0)
+                            else:
+                                # print("inputs 3: ", sumVars[field][gridInd][0], weightVals)
+                                # print("outputs 3: ", numpy.nansum([sumVars[field][gridInd][0], weightVals]))
+                                sumVars[field][gridInd] = \
+                                     numpy.nansum([sumVars[field][gridInd][0],\
+                                                   weightVals])
+                        counter += 1
+                        if verbose:
+                            sys.stdout.write("\rData added from {0} pixels.\n"\
+                                                                .format(counter))
+                            sys.stdout.flush()
+                map['parser'] = parser  # return parser to map
+
+        # divide out variables by weights to get avgs. 
+        oldSettings = numpy.seterr(divide='ignore')
+        avgs = dict()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for (field,var) in sumVars.items():
+                unfiltAvgs = var/sumWght
+                filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, self.parmDict['fillVal'])
+                # strip trailing singlet for 2D arrays
+                if filtAvgs.shape[-2] == 1:
+                    print("first: ", filtAvgs.shape)
+                    avgs[field] = filtAvgs.reshape(filtAvgs.shape[0:len(filtAvgs.shape) - 2])
+                elif filtAvgs.shape[-1] == 1:
+                    print("second: ", filtAvgs.shape)
+                    avgs[field] = filtAvgs.reshape(filtAvgs.shape[0:len(filtAvgs.shape) - 1])
+                else:
+                    print("third: ", filtAvgs.shape)
+                    avgs[field] = filtAvgs
+        numpy.seterr(divide=oldSettings['divide'])
+
+
+        # associate coindexed parameters into dicts 
+        # so we can loop by field
+        outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+
+        # write out results to a netcdf file
+        outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
+        # create the 2 dimensions all files use
+        outFid.createDimension('row', nRows)
+        outFid.createDimension('col', nCols)
+        # write global attributes
+        setattr(outFid, 'Version', vsnmsg(version))
+        setattr(outFid, 'File_start_time', utils.nsecs_to_timestr(self.parmDict['timeStart'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'File_end_time', utils.nsecs_to_timestr(self.parmDict['timeStop'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'Max_valid_cloud_fraction', self.parmDict['cloudFractUpperCutoff'])
+        setattr(outFid, 'Max_valid_solar_zenith_angle', self.parmDict['solarZenAngUpperCutoff'])
+        setattr(outFid, 'Time_comparison_scheme', self.parmDict['timeComparison'])
+        fileListStr = ' '.join([map['parser'].name for map in maps])
+        setattr(outFid, 'Input_files', fileListStr)
+        setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
+        for (k,v) in griddef.parms.items():
+            setattr(outFid, k, v)
+        # loop over fields and write variables
+        for field in self.parmDict['inFieldNames']:
+            # print(field, avgs[field].shape)
+            # create tuple of dimensions, defining new dim
+            # if necessary
+            if len(avgs[field].shape) == 2:
+                # only row/cols
+                varDims = ('row', 'col')
+            elif len(avgs[field].shape) == 3:
+                # has extra dim
+                dimName = extraDim[field]
+                dimSize = avgs[field].shape[2]
+                if dimName not in list(outFid.dimensions.keys()):
+                    outFid.createDimension(dimName, dimSize)
+                varDims = ('row', 'col', dimName)
+            elif len(avgs[field].shape) == 4:
+                # has extra two dims
+                dimName = extraDim[field]
+                dimSize = avgs[field].shape[2]
+                if dimName not in list(outFid.dimensions.keys()):
+                    outFid.createDimension(dimName, dimSize)
+                if "extra_tm5_pressure_level_dim" not in list(outFid.dimensions.keys()):
+                    outFid.createDimension("extra_tm5_pressure_level_dim", 2)
+                varDims = ("row", "col", dimName, "extra_tm5_pressure_level_dim")
+            # create and assign value to varisable
+            varHandle = outFid.createVariable(outFnames[field], 'd', varDims, fill_value=self.parmDict['fillVal'])
+            # print(varHandle)
+            varHandle[:] = avgs[field]
+            # assign variable attributes
+            setattr(varHandle, 'Units', units[field])
+        # Write out the pixel counts if the user requested them
+        if self.parmDict['includePixelCount']:
+            varDims = ('row', 'col')
+            varHandle = outFid.createVariable('ValidPixelCount', 'i', varDims,
+                                              fill_value=self.parmDict['fillVal'])
+            varHandle[:] = nValidPixels
+        outFid.close()
+        # create a dict with the same data as avgs, but with user-specified output file names
+        outAvg = dict()
+        for (k,v) in avgs.items():
+            outAvg[outFnames[k]] = v
+        if self.parmDict['includePixelCount']:
+            outAvg['ValidPixelCount'] = nValidPixels
+        return outAvg
+
+# Author: Eliot Kim
+# Start Date: 10/18/2020
+class tropomi_so2_netCDF_avg_out_func(out_func):
+
+    @staticmethod
+    def parm_list():
+        return ["overallQualFlag", "cloudFrac", "solarZenithAngle", "time", "longitude",
+                "inFieldNames", "outFieldNames", "outUnits", "extraDimLabel", "extraDimSize",
+                "timeComparison", "timeStart", "timeStop", "cloudFractUpperCutoff",
+                "solarZenAngUpperCutoff", "pixIndXtrackAxis", "fillVal", "includePixelCount"]
+
+    @staticmethod
+    def required_parms():
+        return {'overallQualFlag' : ('The name of the field containing ' \
+                                     'the overall quality flag for the ' \
+                                     'pixels.  This flag should be true (1) ' \
+                                     'for invalid pixels and false (0) for ' \
+                                     'valid pixels.\n{ OMI KNMI - Tropo' \
+                                     'sphericColumnFlag\n  OMI NASA - vcd' \
+                                     'QualityFlags \n OMI QA4ECV - processing_error_flag' \
+                                     '\n TROPOMI NO2 - qa_value}',None),
+                'cloudFrac' : ('The name of the field containing the ' \
+                               'cloud fractions\n{ OMI KNMI - CloudFraction' \
+                               '\n  OMI NASA - CloudFraction \n OMI QA4ECV - cloud_fraction' \
+                               '\n TROPOMI NO2 - cloud_fraction}',None),
+                'solarZenithAngle' : ('The name of the field containing the '\
+                                      'solar zenith angles in degrees.\n{ ' \
+                                      'OMI KNMI - SolarZenithAngle\n  OMI ' \
+                                      'NASA - SolarZenithAngle \n OMI QA4ECV - solar_zenith_angle' \
+                                      '\n TROPOMI NO2}',None),
+                'time' : ('The name of the field containing the timestamps. '\
+                          ' Timestamps are assumed to be the in TAI-93 (UTC for OMI QA4ECV)' \
+                          'format.\n{ OMI KNMI - Time\n  OMI NASA - TIME \n OMI QA4ECV - time_utc' \
+                          '\n TROPOMI NO2 - time_utc}', \
+                          None),
+                'longitude' : ('The name of the field containing longitudes ' \
+                               'at cell centers.  Longitudes should be in ' \
+                               'degrees east.\n{ OMI KNMI - Longitude\n  ' \
+                               'OMI NASA - Longitude \n OMI QA4ECV - longitude' \
+                               '\n TROPOMI NO2 - longitude}',None),
+                'inFieldNames' : ('The names of the fields desired to be ' \
+                                  'output.  Input as comma-delimited list ', \
+                                  'list'),
+                'outFieldNames' : ('The names of the output variables (even ' \
+                                   'if they are to be the same as the input ' \
+                                   'variables).  Should be a comma-delimited ' \
+                                   'list co-indexed to inFieldNames','list'),
+                'outUnits' : ('The units of the variables to be written out. ' \
+                              'Should be a comma-delimited list co-indexed ' \
+                              'to inFieldNames','list'),
+                'extraDimLabel' : ('The label for the extra dimension '  \
+                                   '(should the variable have an extra ' \
+                                   'dimension).  Ignored in the case of a ' \
+                                   '2D variable.  Should be a comma-delimited '\
+                                   'list co-indexed to inFieldNames','list'),
+                'extraDimSize' : ('The size of the extra dimensions (should ' \
+                                  'the variable have an extra dimension).  ' \
+                                  'For 2D variables, must be set to 0. (zero)' \
+                                  '  Should be a comma-delimited list ' \
+                                  'co-indexed to inFieldNames.','list'),
+                'timeComparison' : ('Must be set to either "local" or "UTC". ' \
+                                    ' Determines how the file timestamps are ' \
+                                    'compared to the start/stop time.  If set '\
+                                    'to "local", then the file timestamps are '\
+                                    'converted to local time on a pixel-by-'\
+                                    'pixel basis (using longitude to estimate '\
+                                    'time zone) before being compared to time '\
+                                    'boundaries.  If set to "UTC" the file ' \
+                                    'timestamps (which are assumed to be in ' \
+                                    'UTC) are compared against the start/stop '\
+                                    'time directly.',None),
+                'timeStart' : ('The earliest time for which data should be ' \
+                               'recorded into the output file.  All times in ' \
+                               'input files before this time will be filtered '\
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'timeStop' : ('The latest time for which data should be ' \
+                               'recorded into the output files.  All times in '\
+                               'input files after this time will be filtered ' \
+                               'out.  Must be in the format hh:mm:ss_MM-DD-' \
+                               'YYYY','time'),
+                'cloudFractUpperCutoff' : ('The maximum cloud fraction to ' \
+                                           'allow before excluding pixel from '\
+                                           'average.  Suggested value from ' \
+                                           'NASA is 0.3','decimal'),
+                'solarZenAngUpperCutoff' : ('The maximum solar zenith angle to'\
+                                            ' allow before excluding pixel ' \
+                                            'from average, in degrees.  ' \
+                                            'Suggested value from NASA is 85.',\
+                                            'int'),
+                'pixIndXtrackAxis' : ('The dimension order (0 based) of the ' \
+                                      '"cross-track" dimension (whichever ' \
+                                      'dimension has size 60).  For all ' \
+                                      'currently known cases set equal to 1 ' \
+                                      '(depends on the construction of the ' \
+                                      'parser function.  If you rewrite the ' \
+                                      'parser, check this).','int'),
+                'fillVal' : ('The value to use as a fill value in the output ' \
+                             'netCDF file.  This value will replace any missing '\
+                             'or invalid output values','decimal'),
+                'includePixelCount' : ('If set to true, the output will include '\
+                                       'a field "ValidPixelCount" that contains '\
+                                       'the number of valid pixels in each grid '\
+                                       'cell.  Only pixels with nonzero weight  '\
+                                       'are considered valid.', 'bool')}
+
+    __userKeys__ = "inFieldNames"
+
+    def __call__(self, maps, griddef, outfilename, verbose, version):
+        '''Write out a weighted-average file in netcdf format.'''
+        #Make sure non-string parameters are in the correct format
+        dimsizes = self.parmDict['extraDimSize']
+        for i in range(len(dimsizes)):
+            try:
+                dimsizes[i] = int(dimsizes[i])
+            except ValueError:
+                print(("Warning: {dimsizes[i]} is not a valid extraDimSize value.  " \
+                      "Using 0 instead").format(dimsizes[i]))
+                dimsizes[i] = 0
+                continue
+        self.parmDict['extraDimSize'] = dimsizes
+
+        # even though IO interface handles casting already,
+        # a catchblock has been added here for safety
+        # in case someone wants to use this class directly
+        castDict = {'overallQualFlag':str, 'cloudFrac':str,
+                    'solarZenithAngle':str, 'time':str,
+                    'longitude':str, 'inFieldNames':list,
+                    'outFieldNames':list, 'outUnits':list,
+                    'extraDimLabel':list, 'extraDimSize':list,
+                    'timeComparison':str,'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
+                    'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
+                    'fillVal':float, 'includePixelCount':boolCaster}
+        for (k,func) in list(castDict.items()):
+            try:
+                self.parmDict[k] = func(self.parmDict[k])
+            except TypeError:
+                pass
+
+        #Perform some basic sanity checks with parameters
+        if self.parmDict['timeStart'] > self.parmDict['timeStop']:
+            msg = 'Input start time must come before stop time.'
+            raise IOError(msg)
+        if (len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outFieldNames']) or
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['outUnits']) or
+            len(self.parmDict['inFieldNames']) !=  \
+            len(self.parmDict['extraDimLabel'])):
+            msg = 'All field/unit inputs ' + \
+                'should have the same number of elements.'
+            raise IOError(msg)
+
+        # create numpy arrays to hold our data
+        (minRow, maxRow, minCol, maxCol) = griddef.indLims()
+        nRows = maxRow - minRow + 1
+        nCols = maxCol - minCol + 1
+        nValidPixels = numpy.zeros((nRows, nCols))
+        sumWght = numpy.zeros((nRows, nCols, 1, 1))  # needs extra dim to generalize for 3D vars
+        sumVars = dict()
+        for field, size in zip(self.parmDict['inFieldNames'], self.parmDict['extraDimSize']):
+            if field == "tm5_pressure_level_a" or field == "tm5_pressure_level_b":
+                sumVars[field] = numpy.zeros((nRows, nCols, size, 2))
+            elif size:
+                sumVars[field] = numpy.zeros((nRows, nCols, size, 1))
+            else:
+                # pad with a singlet dim if it was 2D
+                sumVars[field] = numpy.zeros((nRows, nCols, 1, 1))
+
+        # loop over maps
+        if not isinstance(maps, list):
+            maps = [maps] # create list if we only got a single map
+
+        for map in maps:
+            # open up context manager
+            with map.pop('parser') as parser: # remove parser for looping
+                if verbose:
+                    print(('Processing {0} for output at {1}.'.format(\
+                            parser.name, str(datetime.datetime.now()))))
+                counter = 0
+                # loop over gridboxes in map and calculate weights
+                for (gridCell, pixTup) in map.items():
+                    # translate gridCell to account 
+                    # for possible non-zero ll corner
+                    gridRow = gridCell[0]
+                    gridCol = gridCell[1]
+                    gridInd = (gridRow - minRow, gridCol - minCol)
+                    # print(gridInd)
+                    # get the values needed to calculate weight
+                    for (pxInd, unused_weight) in pixTup:
+                        # check summary flag
+                        sumFlag = parser.get_cm(self.parmDict['overallQualFlag'], pxInd)
+                        cFrac = parser.get_cm(self.parmDict['cloudFrac'], pxInd)
+                        # print(sumFlag, cFrac, pxInd)
+                        # print("first output check: ", pxInd, sumFlag)                        
+                        if sumFlag < 0.5:
+                            continue
+                        # check cloud fraction flag
+
+                        if not (cFrac <= self.parmDict[\
+                                              'cloudFractUpperCutoff']):
+                            continue
+                        # check solar zenith angle flag
+                        solZenAng = parser.get_cm(\
+                                   self.parmDict['solarZenithAngle'], pxInd)
+                        if solZenAng > self.parmDict[\
+                                              'solarZenAngUpperCutoff']:
+                            continue
+                        # check time flag
+                        time = parser.get_cm(self.parmDict['time'], pxInd)[:-8]
+                        time_test = time
+                        time = utils.utc_to_nsecs(time)
+                        # print(time_test, time, self.parmDict['timeStart'], self.parmDict['timeStop'])
+                        # calculate and factor in offset 
+                        # if the user wanted us to
+                        if self.parmDict['timeComparison'] == 'local':
+                            pixLon = parser.get_cm(\
+                                         self.parmDict['longitude'], pxInd)
+                            offset = utils.UTCoffset_from_lon(pixLon)
+                            time += offset
+                        if time < self.parmDict['timeStart'] \
+                               or time > self.parmDict['timeStop']:
+                            # print(time, self.parmDict['timeStart'], self.parmDict['timeStop'])
+                            continue
+                        # read in all the data 
+                        # abandon ship if data is all NaN
+                        print("checkpoint")
+                        rawDataDict = {}
+                        try:
+                            for field in self.parmDict['inFieldNames']:
+                                rawData = parser.get_cm(field, pxInd)
+                                if field == "time_utc":
+                                    rawData = utils.utc_to_nsecs(rawData[:-8])
+                                if numpy.isnan(rawData).all():
+                                    raise invalidPixCeption
+                                rawDataDict[field] = rawData
+                        except invalidPixCeption:
+                            continue
+                        # compute the weight
+                        fov = pxInd[self.parmDict['pixIndXtrackAxis']]
+                        weight = _OMNO2e_formula(cFrac, fov)
+                        assert weight != numpy.NaN
+                        if weight > 0:
+                            nValidPixels[gridInd] += 1
+
+                        # add the weight to the total for this cell 
+                        sumWght[gridInd] += weight
+                        for field in self.parmDict['inFieldNames']:
+                            # print("Initial data: ", field, rawDataDict[field], sumVars[field][gridInd])
+                            weightVals = rawDataDict[field] * weight
+                            if weightVals.size > 1:
+                                if (sumVars[field][gridInd].shape[-1] == 1):
+                                    # print("inputs 1: ", [sumVars[field][gridInd].reshape(sumVars[field][gridInd].shape[0]), weightVals])
+                                    # print("outputs 1: ", numpy.nansum([sumVars[field][gridInd].reshape(sumVars[field][gridInd].shape[0]),\
+                                    #                 weightVals], axis=0))
+                                    temp = numpy.nansum([sumVars[field][gridInd].reshape(sumVars[field][gridInd].shape[0]),\
+                                                    weightVals], axis=0)
+                                    sumVars[field][gridInd] = temp[..., numpy.newaxis]
+
+                                else:
+                                    # print("inputs 2: ", [sumVars[field][gridInd], weightVals])
+                                    # print("outputs 2: ", numpy.nansum([sumVars[field][gridInd],\
+                                    #                 weightVals], axis=0))
+                                    sumVars[field][gridInd] = \
+                                        numpy.nansum([sumVars[field][gridInd],\
+                                                    weightVals], axis=0)
+                            else:
+                                # print("inputs 3: ", sumVars[field][gridInd][0], weightVals)
+                                # print("outputs 3: ", numpy.nansum([sumVars[field][gridInd][0],\
+                                #                    weightVals]))
+                                sumVars[field][gridInd] = \
+                                     numpy.nansum([sumVars[field][gridInd][0],\
+                                                   weightVals])
+                    # counter += 1
+                    # print(counter)
+                map['parser'] = parser  # return parser to map
+
+        # divide out variables by weights to get avgs. 
+        oldSettings = numpy.seterr(divide='ignore')
+        avgs = dict()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for (field,var) in sumVars.items():
+                unfiltAvgs = var/sumWght
+                filtAvgs = numpy.where(sumWght != 0, unfiltAvgs, \
+                           self.parmDict['fillVal'])
+                # strip trailing singlet for 2D arrays
+                if filtAvgs.shape[-2] == 1:
+                    avgs[field] = filtAvgs.reshape(filtAvgs.shape[0:2])
+                elif filtAvgs.shape[-1] == 1:
+                    avgs[field] = filtAvgs.reshape(filtAvgs.shape[0:3])
+                else:
+                    avgs[field] = filtAvgs
+        numpy.seterr(divide=oldSettings['divide'])
+
+
+        # associate coindexed parameters into dicts 
+        # so we can loop by field
+        outFnames = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outFieldNames']))
+        units = dict(zip(self.parmDict['inFieldNames'], self.parmDict['outUnits']))
+        extraDim = dict(zip(self.parmDict['inFieldNames'], self.parmDict['extraDimLabel']))
+
+        # write out results to a netcdf file
+        outFid = netCDF4.Dataset(outfilename, 'w', format='NETCDF3_CLASSIC')
+        # create the 2 dimensions all files use
+        outFid.createDimension('row', nRows)
+        outFid.createDimension('col', nCols)
+        # write global attributes
+        setattr(outFid, 'Version', vsnmsg(version))
+        setattr(outFid, 'File_start_time', utils.nsecs_to_timestr(self.parmDict['timeStart'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'File_end_time', utils.nsecs_to_timestr(self.parmDict['timeStop'], '00:00:00 01-01-1993'))
+        setattr(outFid, 'Max_valid_cloud_fraction', self.parmDict['cloudFractUpperCutoff'])
+        setattr(outFid, 'Max_valid_solar_zenith_angle', self.parmDict['solarZenAngUpperCutoff'])
+        setattr(outFid, 'Time_comparison_scheme', self.parmDict['timeComparison'])
+        fileListStr = ' '.join([map['parser'].name for map in maps])
+        setattr(outFid, 'Input_files', fileListStr)
+        setattr(outFid, 'Projection', griddef.__class__.__name__[:-8])
+        for (k,v) in griddef.parms.items():
+            setattr(outFid, k, v)
+        # loop over fields and write variables
+        for field in self.parmDict['inFieldNames']:
+            print(field, avgs[field].shape)
+            # create tuple of dimensions, defining new dim
+            # if necessary
+            if len(avgs[field].shape) == 2:
+                # only row/cols
+                varDims = ('row', 'col')
+            elif len(avgs[field].shape) == 3:
+                # has extra dim
+                dimName = extraDim[field]
+                dimSize = avgs[field].shape[2]
+                if dimName not in list(outFid.dimensions.keys()):
+                    outFid.createDimension(dimName, dimSize)
+                varDims = ('row', 'col', dimName)
+            elif len(avgs[field].shape) == 4:
+                # has extra two dims
+                dimName = extraDim[field]
+                dimSize = avgs[field].shape[2]
+                if dimName not in list(outFid.dimensions.keys()):
+                    outFid.createDimension(dimName, dimSize)
+                if "extra_tm5_pressure_level_dim" not in list(outFid.dimensions.keys()):
+                    outFid.createDimension("extra_tm5_pressure_level_dim", 2)
+                varDims = ("row", "col", dimName, "extra_tm5_pressure_level_dim")
+            # create and assign value to varisable
+            varHandle = outFid.createVariable(outFnames[field], 'd', varDims, fill_value=self.parmDict['fillVal'])
+            print(varHandle)
+            varHandle[:] = avgs[field]
+            # assign variable attributes
+            setattr(varHandle, 'Units', units[field])
+        # Write out the pixel counts if the user requested them
+        if self.parmDict['includePixelCount']:
+            varDims = ('row', 'col')
+            varHandle = outFid.createVariable('ValidPixelCount', 'i', varDims,
+                                              fill_value=self.parmDict['fillVal'])
+            varHandle[:] = nValidPixels
+        outFid.close()
+        # create a dict with the same data as avgs, but with user-specified output file names
+        outAvg = dict()
+        for (k,v) in avgs.items():
             outAvg[outFnames[k]] = v
         if self.parmDict['includePixelCount']:
             outAvg['ValidPixelCount'] = nValidPixels

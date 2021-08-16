@@ -7,12 +7,12 @@ of GIS programs
 
 import time
 import calendar
-from itertools import izip
+
 
 import numpy
 import netCDF4
 
-import filetypes
+from . import filetypes
 
 def wrap_lon_0_360(lon):
     '''Wrap a single longitude to the interval [0, 360)'''
@@ -75,7 +75,15 @@ def nsecs_to_timestr(nSecsSinceEpoch,
     nSecsUnix = nSecsSinceEpoch + nSecsAtEpoch
     tStructUnix = time.gmtime(nSecsUnix)
     return time.strftime(format, tStructUnix)
-    
+
+def utc_to_nsecs(utcString, epoch = "1993-01-01T00:00:00", format="%Y-%m-%dT%H:%M:%S"):
+    # print("utils", utcString)
+    timeStruct = time.strptime(utcString, format)
+    epochStruct = time.strptime(epoch, format)
+    timeSecs = calendar.timegm(timeStruct)
+    epochSecs = calendar.timegm(epochStruct)
+    return timeSecs - epochSecs
+
 def UTCoffset_from_lon(lon):
     '''
     Calculate the approximate offset from UTC based on longitude.
@@ -127,7 +135,7 @@ def write_grid_to_netcdf(griddef, outFname):
     # create the 5 grid definitions
     offsets = [(0,0), (1,0), (1,1), (0,1), (.5,.5)] # row,col
     labels = ['ll', 'ul', 'ur', 'lr', 'cent']
-    for (lbl, (rowOff, colOff)) in izip(labels,offsets):
+    for (lbl, (rowOff, colOff)) in zip(labels,offsets):
         lon = fid.createVariable(lbl+'_lon', 'f', dims)
         setattr(lon, 'Units', 'degrees_east')
         lat = fid.createVariable(lbl+'_lat', 'f', dims)
@@ -135,7 +143,7 @@ def write_grid_to_netcdf(griddef, outFname):
         (lat[:], lon[:]) = griddef.griddedToGeo(rows+rowOff, cols+colOff)
     # write grid parameters to file as global attributes
     setattr(fid, 'Projection', griddef.__class__.__name__[:-8])
-    for (k,v) in griddef.parms.iteritems():
+    for (k,v) in griddef.parms.items():
         setattr(fid, k, v)
     fid.close()
 
@@ -162,8 +170,8 @@ def parse_fromFile_input_file(inFileName, dryRun):
                         continue
                     s = s.split('"')
                     if(len(s) > 1 and dryRun):
-                        print "Warning: Found line containing "\
-                              "stray quotation marks... stripping."
+                        print("Warning: Found line containing "\
+                              "stray quotation marks... stripping.")
                     words = ("".join(s)).split()
                     '''Determine what the line is supposed to do'''
                     if(words == []):
@@ -248,7 +256,7 @@ def parse_filetype(namespace):
 
     try:
         if (namespace.verbose != 'False'):
-            print wng
+            print(wng)
     except:
         pass
     return namespace

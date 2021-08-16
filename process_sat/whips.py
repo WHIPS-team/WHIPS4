@@ -1,4 +1,4 @@
-#! /Library/Frameworks/Python.framework/Versions/Current/bin/python
+#! /home/harkey/miniconda3/envs/whipsenv/bin/python
 '''
 New command-line io for oberman's process scripts
 
@@ -7,16 +7,19 @@ Process a series of files, generating some kind of output for each
 If verbose is set to True, all default status updates will be printed.  
 If set to False, the program will run silently
 
-@version 03/26/2019
-@author: maki, oberman, jin, wang, penn
+@version 01/22/2021
+@author: maki, oberman, jin, wang, penn, kim
 '''
 import os
 import sys
 import datetime
-from itertools import izip
+
 import textwrap
 import argparse
 import pdb
+
+from builtins import input
+from builtins import str
 
 from process_sat import parse_geo
 from process_sat import grid_geo
@@ -29,7 +32,7 @@ from process_sat import filetypes
 '''
 VERSION NUMBER
 '''
-__version__ = "3.0.2"
+__version__ = "4.0"
 
 class NeedToParseInFileException(Exception):
     '''exception class for signaling the need to parse input file'''
@@ -54,8 +57,8 @@ def bad_file(filename):
                            "processing.  Enter (3) to quit this program.  " \
                            "Enter your selection here: ".format(filename)))
     while True:
-        print prompt 
-        answer = raw_input(" ==> ")
+        print(prompt) 
+        answer = input(" ==> ")
         try:
             answer = int(answer)
         except(ValueError, TypeError):
@@ -81,8 +84,8 @@ class inFromFileAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         fname = os.path.abspath(values[0])
         if not os.access(fname, os.R_OK):
-            print textwrap.wrap("Error: Unable to read from file {0}.  Check "\
-                                "the input file and try again.".format(fname))
+            print(textwrap.wrap("Error: Unable to read from file {0}.  Check "\
+                                "the input file and try again.".format(fname)))
             sys.exit(0)
         raise NeedToParseInFileException(fname)
 
@@ -102,8 +105,8 @@ class ListAttrsAction(argparse.Action):
                   ', '.join(grid_geo.ValidProjections()) + ', ' + \
                   ', '.join(parse_geo.SupportedFileTypes()) + \
                   "} and try again.")
-            print '\n'.join(textwrap.wrap(ms, width = 76, 
-                                          subsequent_indent = '    '))
+            print('\n'.join(textwrap.wrap(ms, width = 76, 
+                                          subsequent_indent = '    ')))
 
         # print the attribute help for each selected projection/outfunc
         indent = '                        '
@@ -114,14 +117,14 @@ class ListAttrsAction(argparse.Action):
         for string in values:
             if string in parse_geo.SupportedFileTypes():
                 ftype = getattr(filetypes, string + '_filetype')
-                print 'Using output function ' + ftype.doutf + \
-                      '\n   for filetype ' + string + '.'
+                print('Using output function ' + ftype.doutf + \
+                      '\n   for filetype ' + string + '.')
                 list = getattr(out_geo, ftype.doutf + '_out_func').parm_list()
                 list = [el for el in list if el not in dir(ftype)] \
                             + [el for el in ftype.parserParms]
-                rDict = dict(getattr(out_geo, ftype.doutf + \
-                               '_out_func').required_parms().items() + \
-                                ftype.parserParms.items())
+                rDict = dict(list(getattr(out_geo, ftype.doutf + \
+                               '_out_func').required_parms().items()) + \
+                                list(ftype.parserParms.items()))
             elif string in out_geo.ValidOutfuncs():
                 #build list of attributes
                 list = getattr(out_geo, string + '_out_func').parm_list()
@@ -131,10 +134,10 @@ class ListAttrsAction(argparse.Action):
                 list = getattr(grid_geo, string + '_GridDef').parm_list()
                 rDict = getattr(grid_geo, string + '_GridDef').requiredParms() 
             else:
-                print string + ' is not a valid projection, output function,'\
-                    'or filetype.'
+                print(string + ' is not a valid projection, output function,'\
+                    'or filetype.')
                 continue
-            print 'Attributes required for ' + string + ':'
+            print('Attributes required for ' + string + ':')
 
             for key in list:
                 if len(key) < 20:
@@ -142,14 +145,14 @@ class ListAttrsAction(argparse.Action):
                                 key + ''.join((22 - len(key))*[' ']), \
                                 subsequent_indent = indent, width = 76)
                 else:
-                    print '  ' + key
+                    print('  ' + key)
                     formatter = textwrap.TextWrapper(initial_indent = indent,
                                 subsequent_indent = indent, width = 76)
                 text = rDict[key][0].split('\n')
-                print '\n'.join(formatter.wrap(text[0]))
+                print('\n'.join(formatter.wrap(text[0])))
                 for line in text[1:]:
-                    print '\n'.join(follow_up.wrap(line))
-            print ''
+                    print('\n'.join(follow_up.wrap(line)))
+            print('')
         sys.exit(0)
     
 def double(string):
@@ -231,18 +234,18 @@ parser.add_argument('--inFromFile', nargs=1, help='Supply this flag, ' \
 # Parse the inputs #
 # ---------------- #
 # Welcome screen
-print "\n\n           WISCONSIN HORIZONTAL INTERPOLATION PROGRAM " \
+print("\n\n           WISCONSIN HORIZONTAL INTERPOLATION PROGRAM " \
       "FOR SATELLITES \n                                 Version " + \
-      __version__ + "\n"
+      __version__ + "\n")
 
 
 try:
     gnomespice = parser.parse_args()
 except NeedToParseInFileException as fname:
-    print "parsing from input file {0}".format(fname[0])
-    print "This run can be repeated by executing the following call:\n  " \
+    print("parsing from input file {0}".format(fname[0]))
+    print("This run can be repeated by executing the following call:\n  " \
           + "\n    ".join(textwrap.wrap("whips.py {0}".format(\
-                " ".join(utils.parse_fromFile_input_file(fname[0], True))), 70))
+                " ".join(utils.parse_fromFile_input_file(fname[0], True))), 70)))
     gnomespice = \
         parser.parse_args(utils.parse_fromFile_input_file(fname[0], False))
 
@@ -261,21 +264,21 @@ if len(directory) == 1:
     directory = directory[0]
 else:
     if verbose:
-        print "Using '.' character as shorthand for current working directory"
+        print("Using '.' character as shorthand for current working directory")
     directory = os.getcwd().join(directory)
 outDirectory = gnomespice.outDirectory.split('.')
 if len(outDirectory) == 1:
     outDirectory = outDirectory[0]
 else:
-    print "Using '.' character as shorthand for current working directory"
+    print("Using '.' character as shorthand for current working directory")
     outDirectory = os.getcwd().join(outDirectory)
 
 # Make sure the directories are valid
 if not os.path.isdir(directory):
-    print "Error: {0} is not a valid directory".format(directory)
+    print("Error: {0} is not a valid directory".format(directory))
     sys.exit(0)
 if not os.path.isdir(outDirectory):
-    print "Error: {0} is not a valid directory".format(outDirectory)
+    print("Error: {0} is not a valid directory".format(outDirectory))
     sys.exit(0)
 
 # parse output filename
@@ -287,13 +290,13 @@ outFileName = (gnomespice.outFileName and \
 # can be accessed and written to 
 if not os.access(outDirectory, os.W_OK) or (os.path.isfile(outFileName)\
           and not os.access(outFileName, os.W_OK)):
-    print textwrap.wrap("Error: Unable to write output to file {1} in "\
+    print(textwrap.wrap("Error: Unable to write output to file {1} in "\
                         "directory {0}.  You may not have write permissions "\
                         "to that directory, or that directory may already "\
                         "contain an existing file of that name, for which "\
                         "you do not have write permissions.  Check the "\
                         "output directory and try again.".format(\
-                        outDirectory, gnomespice.outFileName), 75)
+                        outDirectory, gnomespice.outFileName), 75))
     sys.exit(0)
 
 # To be implemented later (maybe)
@@ -306,7 +309,7 @@ gridDict = dict()
 
 # retrieve output function function from out_geo
 outFunc = getattr(out_geo, gnomespice.outFunc + '_out_func')
-if verbose: print('Using outfunc ' + gnomespice.outFunc)
+if verbose: print(('Using outfunc ' + gnomespice.outFunc))
 
 # output function parameter dictionary
 outParms = dict()
@@ -314,8 +317,8 @@ outParms = dict()
 # parse input to initialize gridDict and outParms
 # if any parameters aren't found, print an error message for each
 # and quit the program.
-if verbose: print('Parsing inputs... '+str(datetime.datetime.now()) + \
-                  '\nChecking for required parameters...')
+if verbose: print(('Parsing inputs... '+str(datetime.datetime.now()) + \
+                  '\nChecking for required parameters...'))
 def argerrmsg(attr, type): 
     return textwrap.TextWrapper(initial_indent = "Argument Error: ", \
                                 subsequent_indent = "                ", \
@@ -383,6 +386,7 @@ for attr in parms:
 
 # Build the error message for output function parameters 
 parms = outFunc.required_parms()
+
 try:
     # add coindexed list indexer to dictionary first
     outParms[outFunc.__userKeys__] = getattr(gnomespice, 
@@ -420,11 +424,12 @@ try:
                                                        "a positive decimal")
             elif parms[attr][1] == 'list':
                 try:
+                    print(getattr(gnomespice, attr))
                     outParms[attr] = getattr(gnomespice, attr).split(',')
                 except AttributeError:
                     outParms[attr] = [getattr(gnomespice, attr)[el] for \
                                       el in outParms[outFunc.__userKeys__]]
-                    print "   {0}".format(outParms[attr])
+                    print("   {0}".format(outParms[attr]))
             elif parms[attr][1] == 'listoflists':
                 try:
                     lists = getattr(gnomespice, attr).split('/')
@@ -535,9 +540,9 @@ try:
                     parserParms[attr] = None
                     continue
                 if not os.path.isdir(getattr(gnomespice,attr)):
-                    print "WARNING: {0} is not a valid directory for corner file "\
+                    print("WARNING: {0} is not a valid directory for corner file "\
                           "input.  If you are using regional intersect mapping, "\
-                          "this run may terminate unexpectedly".format(getattr(gnomespice, attr))
+                          "this run may terminate unexpectedly".format(getattr(gnomespice, attr)))
                     parserParms[attr] = None
                 else:
                     parserParms[attr] = getattr(gnomespice, attr)
@@ -553,41 +558,41 @@ except AttributeError:
 
 # Unless everything checked out, print those messages and quit
 if unitParms != []:
-    print '\n'.join(unitParms)
+    print('\n'.join(unitParms))
     sys.exit(0)
 if verbose: print('                                    Done.')
 
 # ---------------------- #
 # Initialize the parsers #
 # ---------------------- #
-if verbose: print('building filelist '+str(datetime.datetime.now()))
+if verbose: print(('building filelist '+str(datetime.datetime.now())))
 filetype = gnomespice.filetype
 # if a filelist was provided, use those files,
 # otherwise, just use every file in the directory
 files = [os.path.join(directory, f) for f in \
              gnomespice.fileList or os.listdir(directory)]
 parsers = []
-if verbose: print('getting parsers '+str(datetime.datetime.now()))
+if verbose: print(('getting parsers '+str(datetime.datetime.now())))
 badfile = gnomespice.interactive == 'True' and bad_file or bad_file_default
 
 for f in files:
-    if verbose: print "Instantiating parser for file {0}".format(f)
+    if verbose: print("Instantiating parser for file {0}".format(f))
     try:
         parser = parse_geo.get_parser(f, filetype, parserParms)
     except IOError as inst:
         #        print "==\n{0}\n==".format(inst.args[0])
-        if verbose: print "there was an IOError when instantiating parser"
+        if verbose: print("there was an IOError when instantiating parser")
         answer = badfile(f) # badfile() depends on --interactive
-        if answer is 1:
+        if answer == 1:
             continue
-        elif answer is 2:
+        elif answer == 2:
             break
-        elif answer is 3:
+        elif answer == 3:
             raise SystemExit
     except Exception as inst:
-        if verbose: print inst.args[0]
+        if verbose: print(inst.args[0])
         continue
-    if verbose: print "parser appended successfully."
+    if verbose: print("parser appended successfully.")
     parsers.append(parser)
 
 # ----------------- #
@@ -595,26 +600,26 @@ for f in files:
 # ----------------- #
 
 # Construct the grid definition
-if verbose: print('constructing grid '+str(datetime.datetime.now()))
+if verbose: print(('constructing grid '+str(datetime.datetime.now())))
 griddef = gridDef(gridDict)
 
 gridFileName = gnomespice.includeGrid
 if gridFileName:
     if not os.access(os.path.dirname(gridFileName), os.W_OK):
-        print textwrap.wrap("Warning: Unable to write output to file {0}.  "\
+        print(textwrap.wrap("Warning: Unable to write output to file {0}.  "\
                             "No gridcell file will be written for this run."\
-                            "".format(gridFileName), 75)
+                            "".format(gridFileName), 75))
     else:
-        if verbose: print('writing grid to file '+str(datetime.datetime.now()))
+        if verbose: print(('writing grid to file '+str(datetime.datetime.now())))
         utils.write_grid_to_netcdf(griddef, gridFileName)
 
 # Map data to grid
-if verbose: print('calculating maps '+str(datetime.datetime.now()))
+if verbose: print(('calculating maps '+str(datetime.datetime.now())))
 mapFunc = getattr(map_geo, gnomespice.mapFunc + '_map_geo')
 maps = [mapFunc(p, griddef, verbose) for p in parsers]
 
 # Construct output
-if verbose: print('creating outfiles '+str(datetime.datetime.now()))
+if verbose: print(('creating outfiles '+str(datetime.datetime.now())))
 outputs = outFunc(outParms)(maps,griddef,outFileName,verbose,__version__)
 
 # eventually, we may want to do stuff to outputs, but for now...

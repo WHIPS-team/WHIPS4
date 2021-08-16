@@ -5,20 +5,24 @@ import unittest
 import os
 import sys
 import tempfile
-from itertools import izip, product
+from itertools import product
 import pdb
 
 import numpy
 import netCDF4
 import tables
 
-import parse_geo
-import grid_geo
-import map_geo
-import out_geo
-import utils
+from . import parse_geo
+from . import grid_geo
+from . import map_geo
+from . import out_geo
+from . import utils
+from functools import reduce
+from builtins import object
+from builtins import zip
+from builtins import range
 
-class Helpers:
+class Helpers(object):
 
     @staticmethod 
     def genNan(shape):
@@ -28,8 +32,8 @@ class Helpers:
 
 def does_pytables_close_all(filename):
     '''Returns true if pytables shows all files as closed after one is closed, false otherwise'''
-    fid1 = tables.openFile(filename, mode='r')
-    fid2 = tables.openFile(filename, mode='r')
+    fid1 = tables.open_file(filename, mode='r')
+    fid2 = tables.open_file(filename, mode='r')
     fid1.close()
     retVal = not fid2.isopen
     fid2.close()
@@ -358,7 +362,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 
     def test_get_cm_closes_when_done(self):
         closes_all = does_pytables_close_all(self.fname)
-        fid = tables.openFile(self.fname, mode='r')
+        fid = tables.open_file(self.fname, mode='r')
         with self.parser as p:
             unused_var = p.get_cm('Time')
         if closes_all:
@@ -378,7 +382,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                  1622*60,
                  4*1622*60,
                  1622]
-        for (key, size) in izip(self.checkKeys, sizes):
+        for (key, size) in zip(self.checkKeys, sizes):
             self.assertEqual(self.parser.get(key).size, size)
             
     def test_get_cm_retrieves_right_sizes(self):
@@ -393,7 +397,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                  4*1622*60,
                  1622]
         with self.parser as p:
-            for (key, size) in izip(self.checkKeys, sizes):
+            for (key, size) in zip(self.checkKeys, sizes):
                 self.assertEqual(p.get_cm(key).size, size)                   
             
     def test_get_retrieves_right_type(self):
@@ -408,7 +412,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                  numpy.float32,
                  numpy.float64]
         self.longMessage = True
-        for (key, type) in izip(self.checkKeys, types):
+        for (key, type) in zip(self.checkKeys, types):
             self.assertEqual(self.parser.get(key).dtype, type, 
                              msg="Type did not match for field %s." % key)
             
@@ -425,7 +429,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                  numpy.float64]
         self.longMessage = True
         with self.parser as p:
-            for (key, type) in izip(self.checkKeys, types):
+            for (key, type) in zip(self.checkKeys, types):
                 self.assertEqual(p.get_cm(key).dtype, type, 
                                  msg="Mismatched type in field %s." % key)
                          
@@ -441,7 +445,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([-127], 'int8'),
                 numpy.array([69.41081, 69.392624, 68.29076, 68.273315]),
                 numpy.array([5.782786531883371*pow(10,8)])]
-        for (key, val) in izip(self.checkKeys, vals):
+        for (key, val) in zip(self.checkKeys, vals):
             numpy.testing.assert_array_almost_equal(self.parser.get(key, (0,0)), val, decimal=3)
             
     def test_get_cm_retrieves_first_element(self):
@@ -457,7 +461,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([69.41081, 69.392624, 68.29076, 68.273315]),
                 numpy.array([5.782786531883371*pow(10,8)])]
         with self.parser as p:
-            for (key, val) in izip(self.checkKeys, vals):
+            for (key, val) in zip(self.checkKeys, vals):
                 numpy.testing.assert_array_almost_equal(p.get_cm(key, (0,0)), val, decimal=3, err_msg='Mismatch in %s' % key)
                             
     def test_get_retrieves_nan_at_189_2(self):
@@ -472,7 +476,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([-127], 'int8'),
                 numpy.array([65.86792, 65.95058, 65.240585, 65.32061]),
                 numpy.array([5.78279031260359*pow(10,8)])]
-        for (key, val) in izip(self.checkKeys, vals):
+        for (key, val) in zip(self.checkKeys, vals):
             numpy.testing.assert_array_almost_equal(self.parser.get(key, (189,2)), val, decimal=3)
             
     def test_get_cm_retrieves_nan_at_189_2(self):
@@ -488,7 +492,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([65.86792, 65.95058, 65.240585, 65.32061]),
                 numpy.array([5.78279031260359*pow(10,8)])]
         with self.parser as p:
-            for (key, val) in izip(self.checkKeys, vals):
+            for (key, val) in zip(self.checkKeys, vals):
                 numpy.testing.assert_array_almost_equal(p.get_cm(key, (189,2)), val, decimal=3)
                     
     def test_get_retrieves_last_element(self):
@@ -503,7 +507,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([-127], 'int8'),
                 numpy.array([80.10472, 79.99527, 80.49099, 80.378]),
                 numpy.array([5.78284540309156*pow(10,8)])]
-        for (key, val) in izip(self.checkKeys, vals):
+        for (key, val) in zip(self.checkKeys, vals):
             numpy.testing.assert_array_almost_equal(self.parser.get(key, (1621, 59)), val, decimal=3)
             
     def test_get_cm_retrieves_last_element(self):
@@ -519,7 +523,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([80.10472, 79.99527, 80.49099, 80.378]),
                 numpy.array([5.78284540309156*pow(10,8)])]
         with self.parser as p:
-            for (key, val) in izip(self.checkKeys, vals):
+            for (key, val) in zip(self.checkKeys, vals):
                 numpy.testing.assert_array_almost_equal(p.get_cm(key, (1621, 59)), val, decimal=3)
             
     def test_get_retrieves_valid_at_6_5(self):
@@ -534,7 +538,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([-1]),
                 numpy.array([73.72836, 73.68924, 73.12749, 73.089355]),
                 numpy.array([5.782786651906409*pow(10,8)])]
-        for (key, val) in izip(self.checkKeys, vals):
+        for (key, val) in zip(self.checkKeys, vals):
             numpy.testing.assert_allclose(self.parser.get(key, (6,5)), val, rtol=1E-5)
             
     def test_get_cm_retrieves_valid_at_6_5(self):
@@ -550,7 +554,7 @@ class TestKnmiOmiL2Parser(unittest.TestCase):
                 numpy.array([73.72836, 73.68924, 73.12749, 73.089355]),
                 numpy.array([5.782786651906409*pow(10,8)])]
         with self.parser as p:
-            for (key, val) in izip(self.checkKeys, vals):
+            for (key, val) in zip(self.checkKeys, vals):
                 numpy.testing.assert_allclose(p.get_cm(key, (6,5)), val, rtol=1E-5)
                 
     def test_get_zero_order_array_from_single_point(self):
@@ -786,9 +790,10 @@ class TestNASAOmiL2Parser(TestParser):
                           'AMFPollutedToGroundStd', 'CloudFraction', 'CloudFractionStd', 
                           'CloudRadianceFraction', 'CloudPressure', 'CloudPressureStd',
                           'TerrainReflectivity', 'TerrainPressure', 'TerrainHeight', 
-                          'SmallPixelRadiancePointer', 'InstrumentConfigurationId',
-                          'MeasurementQualityFlags', 'FitQualityFlags', 'AMFQualityFlags', 
-                          'WavelengthRegistrationCheck', 'WavelengthRegistrationCheckStd', 
+                          'TropopausePressure', 'VcdApTrop','SlantColumnAmountNO2', 
+                          'SlantColumnAmountNO2Destriped','SmallPixelRadiancePointer', 
+                          'InstrumentConfigurationId', 'MeasurementQualityFlags', 'FitQualityFlags', 
+                          'AMFQualityFlags', 'WavelengthRegistrationCheck', 'WavelengthRegistrationCheckStd', 
                           'UnpolFldLatBandQualityFlags', 'vcdQualityFlags',
                           'Time', 'Latitude', 'Longitude', 'SpacecraftLatitude',
                           'SpacecraftLongitude', 'SpacecraftAltitude', 'SolarZenithAngle',
@@ -853,7 +858,7 @@ class TestNASAOmiL2Parser(TestParser):
             
     def test_get_cm_cleans_up_open_file(self):
         closes_all = does_pytables_close_all(self.fname)
-        fid = tables.openFile(self.fname, mode='r')
+        fid = tables.open_file(self.fname, mode='r')
         with self.parser as p:
             unused_var = p.get_cm('Time')
         if closes_all:
@@ -1008,7 +1013,7 @@ class TestNASAOmiL2GetGeoCorners(unittest.TestCase):
         # we test above ane ensure we are getting the desired
         # behavior
         closes_all = does_pytables_close_all(self.fname)
-        fid = tables.openFile(self.cornerName, 'r')
+        fid = tables.open_file(self.cornerName, 'r')
         parser = parse_geo.HDFnasaomil2_File(self.fname, cornerDir=self.sample_dir,
                                              cornerFileList=['ominasacornersample.hdf'])
         unused_geoarray = parser.get_geo_corners()
@@ -1165,12 +1170,12 @@ class TestMOPPITl2Parser(TestParser):
         
     def retrieve_values_get(self, fileInd, parser):
         '''This function retrieves a flat array from a file parser with get'''
-        chkList = [parser.get(k, fileInd)[i] for (k,i) in izip(self.retKeys, self.retInd)]
+        chkList = [parser.get(k, fileInd)[i] for (k,i) in zip(self.retKeys, self.retInd)]
         return self.bldFlatArray(chkList)
     
     def retrieve_values_get_cm(self, fileInd, parser):
         '''This function retrieves a flat array from a cm file parser with get_cm'''
-        chkList = [parser.get_cm(k, fileInd)[i] for (k,i) in izip(self.retKeys, self.retInd)]
+        chkList = [parser.get_cm(k, fileInd)[i] for (k,i) in zip(self.retKeys, self.retInd)]
         return self.bldFlatArray(chkList)
 
     def test_instantiate(self):
@@ -1384,7 +1389,7 @@ class TestOverallGridGeo(unittest.TestCase):
         allClasses = [getattr(grid_geo, name+'_GridDef') for name in self.projNames]
         for cls in allClasses:
             for parmName in cls.requiredParms():
-                self.assertTrue(parmName in self.fakeParms.keys())
+                self.assertTrue(parmName in list(self.fakeParms.keys()))
 
     def test_all_classes_implement_indLims(self):
         instClasses = [getattr(grid_geo, name+'_GridDef')(self.fakeParms) for name in self.projNames]
@@ -1490,7 +1495,7 @@ class Testlcc2par_GridDef(TestOverallGridGeo):
         self.assertEqual(maxCol-minCol+1, self.fakeParms['nCols'])
 
     def test_geo2Proj_vs_matlab(self):
-        for ((lat, lon), (x, y)) in izip(self.knownGeoCoords, self.knownProjCoords):
+        for ((lat, lon), (x, y)) in zip(self.knownGeoCoords, self.knownProjCoords):
             (yCalc, xCalc) = self.instance.geoToProjected(lat, lon)
             # use some logic to make sure we don't have way to tight of 
             # tolerances on identically zero points
@@ -1504,13 +1509,13 @@ class Testlcc2par_GridDef(TestOverallGridGeo):
                 self.assertAlmostEqual(x, xCalc, places=6)
 
     def test_geo2Grid_vs_matlab(self):
-        for ((lat, lon), (row, col)) in izip(self.knownGeoCoords, self.knownGridCoords):
+        for ((lat, lon), (row, col)) in zip(self.knownGeoCoords, self.knownGridCoords):
             (rowCalc, colCalc) = self.instance.geoToGridded(lat, lon)
             self.assertAlmostEqual(row, rowCalc)
             self.assertAlmostEqual(col, colCalc)
 
     def test_proj2Geo_vs_matlab(self):
-        for ((x, y), (lat, lon)) in izip(self.knownProjCoords, self.knownGeoCoords):
+        for ((x, y), (lat, lon)) in zip(self.knownProjCoords, self.knownGeoCoords):
             (latCalc, lonCalc) = self.instance.projectedToGeo(y, x)
             # wrap to 0-360 standard for comparison
             lonCalc = utils.wrap_lon_0_360(lonCalc)
@@ -1519,7 +1524,7 @@ class Testlcc2par_GridDef(TestOverallGridGeo):
             self.assertAlmostEqual(lon, lonCalc, delta=abs(lon*1E-6))
 
     def test_griddedToGeo_vs_matlab(self):
-        for ((row, col), (lat, lon)) in izip(self.knownGridCoords, self.knownGeoCoords):
+        for ((row, col), (lat, lon)) in zip(self.knownGridCoords, self.knownGeoCoords):
             (latCalc, lonCalc) = self.instance.griddedToGeo(row, col)
             # wrap to 0-360 standard for comparison
             lonCalc = utils.wrap_lon_0_360(lonCalc)
@@ -1593,22 +1598,22 @@ class Testlatlon_GridDef(unittest.TestCase):
         self.assertEqual(maxCol-minCol+1, self.parms['nCols'])
 
     def test_geo2Proj(self):
-        for ((lat, lon), (y, x)) in izip(self.knownGeoCoords, self.knownProjCoords):
+        for ((lat, lon), (y, x)) in zip(self.knownGeoCoords, self.knownProjCoords):
             (yCalc, xCalc) = self.instance.geoToProjected(lat, lon)
             self.assertEqual((y, x), (yCalc, xCalc))
 
     def test_geo2Grid(self):
-        for ((lat, lon), (row, col)) in izip(self.knownGeoCoords, self.knownGridCoords):
+        for ((lat, lon), (row, col)) in zip(self.knownGeoCoords, self.knownGridCoords):
             (rowCalc, colCalc) = self.instance.geoToGridded(lat, lon)
             self.assertEqual((row, col), (rowCalc, colCalc))
 
     def test_proj2Geo(self):
-        for ((y,x), (lat,lon)) in izip(self.knownProjCoords, self.knownGeoCoords):
+        for ((y,x), (lat,lon)) in zip(self.knownProjCoords, self.knownGeoCoords):
             (latCalc, lonCalc) = self.instance.projectedToGeo(y, x)
             self.assertEqual((lat, lon), (latCalc, lonCalc))
 
     def test_grid2Geo(self):
-        for ((row, col), (lat, lon)) in izip(self.knownGridCoords, self.knownGeoCoords):
+        for ((row, col), (lat, lon)) in zip(self.knownGridCoords, self.knownGeoCoords):
             (latCalc, lonCalc) = self.instance.griddedToGeo(row, col)
             self.assertEqual((lat, lon), (latCalc, lonCalc))
 
@@ -1629,7 +1634,7 @@ class TestMapGeo(unittest.TestCase):
         # create a dictionary with appropriate keys,
         # initialized to empty lists save for parser
         self.testMapDict = {'parser' : self.parser}
-        for indTup in product(range(parms['nRows']), range(parms['nCols'])):
+        for indTup in product(list(range(parms['nRows'])), list(range(parms['nCols']))):
             self.testMapDict[indTup] = []
 
     def test_ValidMaps_are_valid(self):
@@ -1843,7 +1848,7 @@ class Test_regional_intersect(TestMapGeo):
                             [[1,0], [1,1], [1,2]]])
         self.parser.prime_corners(lat, lon, ind)
         mapDict = self.mapper(self.parser, self.grid)
-        for (x,y) in product(range(2), range(3)):
+        for (x,y) in product(list(range(2)), list(range(3))):
             thisPoly = ((x,y), None)
             self.testMapDict[(y,x)].append(thisPoly)
             self.testMapDict[(y+1,x)].append(thisPoly)
@@ -2407,7 +2412,7 @@ class Test_OMNO2e_wght_avg_out_func(TestOutGeo):
                       'xCell' : 0, 'yCell' : 0,
                       'nRows' : 2, 'nCols' : 3 }
         six_el_grid = grid_geo.latlon_GridDef(gridParms)
-        for (i,j) in product(range(2), range(3)):
+        for (i,j) in product(list(range(2)), list(range(3))):
             oneDind = i*3+j
             self.mapDict[(i,j)] = [((0,28+oneDind),None), ((1,28+oneDind),None)]
         avg = self.outfunc(self.mapDict, six_el_grid, self.outFname, verbose=False)
@@ -3138,7 +3143,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
                                 [1, 2, 3, 4, 5, 7]]
         data = numpy.random.rand(2,6)
         self.test2D[0:2,28:34] = data
-        for (i,j) in product(range(2), range(3)):
+        for (i,j) in product(list(range(2)), list(range(3))):
             oneDind = i*3+j
             self.mapDict[(i,j)] = [((0,28+oneDind), None), ((1,28+oneDind), None)]
         resDict = newOutFunc(self.mapDict, self.six_el_grid, 
@@ -3164,7 +3169,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
                                 [1, 2, 3, 4, 5, 7]]
         data = numpy.random.rand(2,6)
         self.test2D[0:2,28:34] = data
-        for (i,j) in product(range(2), range(3)):
+        for (i,j) in product(list(range(2)), list(range(3))):
             oneDind = i*3+j
             self.mapDict[(i,j)] = [((0,28+oneDind), None), ((1,28+oneDind), None)]
         resDict = self.defOutFunc(self.mapDict, self.six_el_grid, 
@@ -3190,7 +3195,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
                                 [1, 2, 3, 4, 5, 7]]
         data = numpy.random.rand(2,6,4)
         self.test3D[0:2,28:34, :] = data
-        for (i,j) in product(range(2), range(3)):
+        for (i,j) in product(list(range(2)), list(range(3))):
             oneDind = i*3+j
             self.mapDict[(i,j)] = [((0,28+oneDind), None), ((1,28+oneDind), None)]        
         resDict = self.defOutFunc(self.mapDict, self.six_el_grid, 
@@ -3378,7 +3383,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         numpy.testing.assert_array_almost_equal(resDict['outTest3D'][:], expected)
         
     def test_output_file_is_netcdf(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3395,7 +3400,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         newOutFunc = out_geo.OMNO2e_netCDF_avg_out_func(self.defParms)
         test3Dagain = numpy.zeros((20,60,4))
         self.parser.prime_get('test3Dagain', test3Dagain)
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = newOutFunc(self.mapDict, self.six_el_grid, 
                                    self.outFname, verbose=False,
@@ -3405,7 +3410,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
 
         
     def test_output_file_contains_start_time(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3414,7 +3419,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertEqual(self.fid.File_start_time, self.startTimeStr)
         
     def test_output_file_contains_stop_time(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3423,7 +3428,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertEqual(self.fid.File_end_time, self.stopTimeStr)   
         
     def test_output_file_contains_grid_name(self):    
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3432,7 +3437,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertEqual(self.fid.Projection, 'latlon')
         
     def test_output_file_contains_cfrac_cutoff(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3441,7 +3446,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertEqual(self.fid.Max_valid_cloud_fraction, self.defParms['cloudFractUpperCutoff'])        
         
     def test_output_file_contains_sza_cutoff(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3451,7 +3456,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
 
         
     def test_output_file_contains_tComp(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3479,7 +3484,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertEqual(self.fid.Input_files, 'foo.dat bar.dat')
         
     def test_output_file_contains_gridParms(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3491,7 +3496,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertDictEqual(self.six_el_gridParms, outDict)
         
     def test_output_file_dims_right_sizes(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3499,35 +3504,35 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.fid = netCDF4.Dataset(self.outFname, 'r')
         expectedDims = {'row' : 2, 'col' : 3, 'layer' : 4}       
         actualDims = {}
-        for (name,dim) in self.fid.dimensions.items():
+        for (name,dim) in list(self.fid.dimensions.items()):
             actualDims[name] = len(dim)
         self.assertDictEqual(expectedDims, actualDims)
         
     def test_output_file_right_variables_no_pixel_count(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
                                         version = self.version)
         self.fid = netCDF4.Dataset(self.outFname, 'r')
-        outVars = self.fid.variables.keys()
+        outVars = list(self.fid.variables.keys())
         self.assertItemsEqual(self.defParms['outFieldNames'], outVars)
 
     def test_output_file_right_variables_with_pixel_count(self):
         self.defParms['includePixelCount'] = True
         newOutFunc = out_geo.OMNO2e_netCDF_avg_out_func(self.defParms)
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = newOutFunc(self.mapDict, self.six_el_grid, 
                                    self.outFname, verbose=False,
                                    version = self.version)
         self.fid = netCDF4.Dataset(self.outFname, 'r')
-        outVars = self.fid.variables.keys()
+        outVars = list(self.fid.variables.keys())
         correctFields = self.defParms['outFieldNames'] + ['ValidPixelCount']
         self.assertItemsEqual(correctFields, outVars)
         
     def test_output_file_correct_fillVals(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3539,7 +3544,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertListEqual(expected, fillVals)
         
     def test_output_file_correct_units(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3550,7 +3555,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
         self.assertListEqual(units, self.defParms['outUnits'])        
         
     def test_output_file_variables_correct_shape(self):
-        for i,j in product(range(2), range(3)):
+        for i,j in product(list(range(2)), list(range(3))):
             self.mapDict[(i,j)] = []
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
                                         self.outFname, verbose=False,
@@ -3624,7 +3629,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
                                 [1, 2, 3, 4, 5, 7]]
         data = numpy.random.rand(2,6,4)
         self.test3D[0:2,28:34, :] = data
-        for (i,j) in product(range(2), range(3)):
+        for (i,j) in product(list(range(2)), list(range(3))):
             oneDind = i*3+j
             self.mapDict[(i,j)] = [((0,28+oneDind), None), ((1,28+oneDind), None)]        
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
@@ -3652,7 +3657,7 @@ class Test_OMNO2e_netCDF_avg_out_func(TestOutGeo):
                                 [1, 2, 3, 4, 5, 7]]
         data = numpy.random.rand(2,6)
         self.test2D[0:2,28:34] = data
-        for (i,j) in product(range(2), range(3)):
+        for (i,j) in product(list(range(2)), list(range(3))):
             oneDind = i*3+j
             self.mapDict[(i,j)] = [((0,28+oneDind), None), ((1,28+oneDind), None)]
         unused_result = self.defOutFunc(self.mapDict, self.six_el_grid, 
@@ -4520,7 +4525,7 @@ class Test_unweighted_filtered_MOPITT_avg_netCDF_out_func(TestOutGeo):
     def test_output_file_contains_gridParms(self):
         unused_result = self.defaultOutFunc()
         self.fid = netCDF4.Dataset(self.outFname, 'r')
-        keys = self.six_el_gridParms.keys()
+        keys = list(self.six_el_gridParms.keys())
         expected = dict()
         for key in keys:
             expected[key] = getattr(self.fid, key)
@@ -4531,7 +4536,7 @@ class Test_unweighted_filtered_MOPITT_avg_netCDF_out_func(TestOutGeo):
         self.fid = netCDF4.Dataset(self.outFname, 'r')
         expectedDims = {'row' : 2, 'col' : 3, 'layer' : 3, 'value' : 2}
         actualDims = {}
-        for (name,dim) in self.fid.dimensions.items():
+        for (name,dim) in list(self.fid.dimensions.items()):
             actualDims[name] = len(dim)
         self.assertDictEqual(actualDims, expectedDims)
 
@@ -4543,7 +4548,7 @@ class Test_unweighted_filtered_MOPITT_avg_netCDF_out_func(TestOutGeo):
                                     self.outFname, verbose=False,
                                     version = self.version)
         self.fid = netCDF4.Dataset(self.outFname, 'r')
-        self.assertItemsEqual(self.fid.variables.keys(), expected)
+        self.assertItemsEqual(list(self.fid.variables.keys()), expected)
 
     def test_output_file_has_correctly_documented_units(self):
         unused_result = self.defaultOutFunc()

@@ -80,7 +80,11 @@ import pyhdf.V
 import pyhdf.VS
 import pyhdf.SD
 
-import filetypes
+from builtins import str
+from builtins import range
+from builtins import object 
+from netCDF4 import Dataset # Eliot addition
+from . import filetypes
 
 def SupportedFileTypes():
     '''Return a list of supported file types'''
@@ -89,13 +93,13 @@ def SupportedFileTypes():
 
 def getOrbitNumber(fPath):    
     '''Takes in the path to a nasa omi hdf file and returns the orbit number'''
-    fid = tables.openFile(fPath)
+    fid = tables.open_file(fPath)
     try:
-        node = fid.getNode('/', 'HDFEOS INFORMATION/CoreMetadata')
+        node = fid.get_node('/', 'HDFEOS INFORMATION/CoreMetadata')
     except tables.exceptions.NoSuchNodeError:
-        node = fid.getNode('/', 'HDFEOS INFORMATION/CoreMetadata.0')
+        node = fid.get_node('/', 'HDFEOS INFORMATION/CoreMetadata.0')
     bigString = str(list(node)[0])
-    strings = bigString.split('\n')
+    strings = bigString.split('\\n')
     for i in range(len(strings)):
         if 'ORBITNUMBER' in strings[i]:
             break
@@ -106,23 +110,26 @@ def getOrbitNumber(fPath):
 
 def getLongName(fPath):
     '''Retrieve the long name of an HDFEOS file'''
-    fid = tables.openFile(fPath)
+    fid = tables.open_file(fPath)
     try:
-        node = fid.getNode('/', 'HDFEOS INFORMATION/ArchiveMetadata')
+        node = fid.get_node('/', 'HDFEOS INFORMATION/ArchiveMetadata')
     except tables.exceptions.NoSuchNodeError:
         try:
-            node = fid.getNode('/', 'HDFEOS INFORMATION/ArchiveMetadata.0')
+            node = fid.get_node('/', 'HDFEOS INFORMATION/ArchivedMetadata.0')
         except:
-            node = fid.getNode('/', 'HDFEOS INFORMATION/ArchivedMetadata')
+            node = fid.get_node('/', 'HDFEOS INFORMATION/ArchivedMetadata')
     bigString = str(list(node)[0])
-    strings = bigString.split('\n')
+    strings = bigString.split('\\n')
     for i in range(len(strings)):
-        if 'LONGNAME' in strings[i]:
+        # if 'LONGNAME' in strings[i]:
+            # break
+        if 'VALUE' in strings[i]:
             break
-    line = strings[i+2]
-    chunks = line.split('"')
+    chunks = strings[i].split('=')[1].split('"')[1]
+    #line = strings[i+2]
+    #chunks = line.split('"')
     fid.close()
-    return chunks[-2]
+    return chunks
 
 def get_parser(file, filetype, parserParms):
     """Retrieve appropriate instantiated parser for a file"""
@@ -140,7 +147,7 @@ def get_parser(file, filetype, parserParms):
             subtype += i
     return parserClass(file, subtype, extension, **parserParms)
 
-class GeoFile():
+class GeoFile(object):
     """Provide interface to geofile."""
     def __init__(self, filename, subtype='', extension=None):
         self.name = filename
@@ -345,7 +352,7 @@ class HDF4File(GeoFile):
                         file type.
         """
         # open the variable if it isn't open already.
-        if key not in self._open_vars.keys():
+        if key not in list(self._open_vars.keys()):
             try:
                 path = self._nameExpMap[key]
                 pathList = [el for el in path.split('/') if el] 
@@ -379,7 +386,7 @@ class HDFFile(GeoFile):
     """Provide generic interface for HDF 5 files"""
     def __init__(self, filename, subtype='', extension=None):
         GeoFile.__init__(self, filename, subtype=subtype, extension=extension)
-        if tables.isHDF5File(self.name):  # sanity check
+        if tables.is_hdf5_file(self.name):  # sanity check
             pass
         else:
             raise IOError('Attempt to read non-HDF 5 file as HDF 5.')
@@ -400,9 +407,9 @@ class HDFFile(GeoFile):
                         n is the number of fundamental dimensions of the 
                         file type.
         """
-        fid = tables.openFile(self.name)
+        fid = tables.open_file(self.name)
         try:
-            var = fid.getNode('/', self._nameExpMap[key])
+            var = fid.get_node('/', self._nameExpMap[key])
             varAtts = var._v_attrs
             missing = getattr(varAtts, '_FillValue', numpy.nan)
             # because attributes are single element arrays
@@ -443,9 +450,9 @@ class HDFFile(GeoFile):
         defined as above.
         """
         # open the var if it isn't open already
-        if key not in self._open_vars.keys():
+        if key not in list(self._open_vars.keys()):
             try:
-                var = self._fid.getNode('/', self._nameExpMap[key])
+                var = self._fid.get_node('/', self._nameExpMap[key])
                 varAtts = var._v_attrs
                 missing = getattr(varAtts, '_FillValue', numpy.nan)
                 # because attributes are single element arrays
@@ -482,7 +489,7 @@ class HDFFile(GeoFile):
             
     def __enter__(self):
         '''Open up file and leave open.'''
-        self._fid = tables.openFile(self.name, mode='r')
+        self._fid = tables.open_file(self.name, mode='r')
         self._open_vars = dict()
         self._scales = dict()
         self._offsets = dict()
@@ -494,6 +501,95 @@ class HDFFile(GeoFile):
         del self._open_vars
         del self._scales
         del self._offsets
+        del self._fid
+        return False
+
+# Author: Eliot Kim
+# Date: 8-11-2020
+class NETCDFFile(GeoFile):
+    """Provide generic interface for netCDF4 files"""
+    def __init__(self, filename, subtype='', extension=None):
+        GeoFile.__init__(self, filename, subtype=subtype, extension=extension)
+
+    def get(self, key, indices=None):
+        """
+        Provide get function for netCDF Files.
+        
+        Requires that parser be set up with _nameExpMap and _indexMap 
+        variables.  These must be defined as:
+        
+        _nameExpMap -   Dictionary.  Keys are field names available to user.
+                        Values are the full path to that field in the netCDF file.
+                       
+        _indexMap -     Dictionary.  Keys are field names available to user.  
+                        Values are functions that when passed (var, ind) where
+                        ind is a n-element tuple will return the proper slice.
+                        n is the number of fundamental dimensions of the 
+                        file type.
+        """
+        fid = Dataset(self.name)
+        try:
+            var = fid[self._nameExpMap[key]]
+            missing = var._FillValue
+
+            if var[:].dtype in ["float32", "float64"]:
+                var = numpy.where(var == missing, numpy.NaN, var)
+
+            if indices is not None:
+                indFunc = self._indexMap.get(key, self._indexMap["default"])
+            else:
+                indFunc = lambda var, ind: var[:]
+
+            return indFunc(var[:], indices)
+        except KeyError:
+            raise KeyError("Attempt to use fieldname not associated with this filetype.")
+        finally:
+            fid.close()
+
+    def get_cm(self, key, indices=None):
+        """
+        Provide get_cm function for netCDF files
+        
+        get_cm works the same as get, but relies on a context manager to speed
+        up access to the underlying files.  Just as get, it requires that 
+        the parser have _nameExpMap and _indexMap variables.  These must be
+        defined as above.
+        """
+        if key not in list(self._open_vars.keys()):
+            try:
+                # print(key)
+                var = self._fid[self._nameExpMap[key]]
+                # print(var, var.shape, indices)
+                try:
+                    missing = var._FillValue
+                    if var[:].dtype in ["float32", "float64"]:
+                        var = numpy.where(var == missing, numpy.NaN, var)
+                except AttributeError:
+                    print("no fill value attribute")
+                    pass
+                self._open_vars[key] = var
+
+            except KeyError:
+                raise KeyError("Attempt to use fieldname not associated with this filetype.")
+
+        if indices is not None:
+            indFunc = self._indexMap.get(key, self._indexMap["default"])
+        else:
+            indFunc = lambda var, ind: var[:]
+
+        if key == "tm5_pressure_level_a" or key == "tm5_pressure_level_b" or 'tm5_constant_a' or 'tm5_constant_b':
+            return indFunc(self._open_vars[key], indices)
+
+        return indFunc(self._open_vars[key], indices)[0]
+
+    def __enter__(self):
+        self._fid = Dataset(self.name, "r")
+        self._open_vars = dict()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._fid.close()
+        del self._open_vars
         del self._fid
         return False
 
@@ -639,7 +735,7 @@ class HDFnasaomil2_File(HDFFile):
                 allPossible = [os.path.join(cornerDir, f) for f in os.listdir(cornerDir)]
                 for f in allPossible:
                     try:
-                        if tables.isHDF5File(f) \
+                        if tables.is_hdf5_file(f) \
                                 and getLongName(f) == HDFnasaomil2_File.OMIAURANO2_CORNER_FILE_NAME \
                                 and getOrbitNumber(f) == forbitnumber:
                             self.pixCorners = f
@@ -648,7 +744,7 @@ class HDFnasaomil2_File(HDFFile):
                         pass
                 
         if self.pixCorners == None:
-            print "No valid corner file found for {0}.".format(filename)
+            print("No valid corner file found for {0}.".format(filename))
             
     __dataPath = '/HDFEOS/SWATHS/ColumnAmountNO2/Data Fields/'
     __geoPath = '/HDFEOS/SWATHS/ColumnAmountNO2/Geolocation Fields/'
@@ -713,6 +809,7 @@ class HDFnasaomil2_File(HDFFile):
                     'TerrainHeight' : __dataPath+'TerrainHeight',
                     'TerrainPressure' : __dataPath+'TerrainPressure',
                     'TerrainReflectivity' : __dataPath+'TerrainReflectivity',
+                    'TropopausePressure' : __dataPath+'TropopausePressure',
                     'TropFractionUnpolluted' : __dataPath+'TropFractionUnpolluted',
                     'TropFractionUnpollutedStd' : __dataPath+'TropFractionUnpollutedStd',
                     'UnpolFldLatBandQualityFlags' : __dataPath+'UnpolFldLatBandQualityFlags',
@@ -754,12 +851,12 @@ class HDFnasaomil2_File(HDFFile):
         latNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLatitude'
         lonNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLongitude'
         try:
-            pxFid = tables.openFile(self.pixCorners)
+            pxFid = tables.open_file(self.pixCorners)
         except AttributeError:
             raise IOError('Unable to open pixel corners file.  Need pixel corners file to use corners')
         try:
-            latNode = pxFid.getNode('/', latNodeName)
-            lonNode = pxFid.getNode('/', lonNodeName)
+            latNode = pxFid.get_node('/', latNodeName)
+            lonNode = pxFid.get_node('/', lonNodeName)
             # Note: it is assumed that there are no missing values.
             lat = latNode[:].transpose((1,2,0))
             lon = lonNode[:].transpose((1,2,0))            
@@ -1142,6 +1239,9 @@ class HDFmodisl2_File(HDF4File):
         if self._ScaleOffsetMap[key]:
            return HDF4File.get(self, key, indices, missingValue=self._FVMap[key])*self._ScaleOffsetMap[key][0]+self._ScaleOffsetMap[key][1]
         else:
+        #    print("in parse_geo.py get_cm function with HDF4 class")
+        #    print(key)
+        #    print(indices)
            return HDF4File.get(self, key, indices, missingValue=self._FVMap[key])
         
     def get_geo_centers(self):
@@ -1237,7 +1337,7 @@ class HDFnasaomihchol2_File(HDFFile):
                 allPossible = [os.path.join(cornerDir, f) for f in os.listdir(cornerDir)]
                 for f in allPossible:
                     try:
-                        if tables.isHDF5File(f) \
+                        if tables.is_hdf5_file(f) \
                                 and getLongName(f) == HDFnasaomihchol2_File.OMIAURAHCHO_CORNER_FILE_NAME \
                                 and getOrbitNumber(f) == forbitnumber:
                             self.pixCorners = f
@@ -1246,7 +1346,7 @@ class HDFnasaomihchol2_File(HDFFile):
                         pass
                 
         if self.pixCorners == None:
-            print "No valid corner file found for {0}.".format(filename)                        
+            print("No valid corner file found for {0}.".format(filename))                        
             
     __dataPath = '/HDFEOS/SWATHS/OMI Total Column Amount HCHO/Data Fields/'
     __geoPath = '/HDFEOS/SWATHS/OMI Total Column Amount HCHO/Geolocation Fields/'
@@ -1301,12 +1401,12 @@ class HDFnasaomihchol2_File(HDFFile):
         latNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLatitude'
         lonNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLongitude'
         try:
-            pxFid = tables.openFile(self.pixCorners)
+            pxFid = tables.open_file(self.pixCorners)
         except AttributeError:
             raise IOError('Unable to open pixel corners file.  Need pixel corners file to use corners')
         try:
-            latNode = pxFid.getNode('/', latNodeName)
-            lonNode = pxFid.getNode('/', lonNodeName)
+            latNode = pxFid.get_node('/', latNodeName)
+            lonNode = pxFid.get_node('/', lonNodeName)
             # Note: it is assumed that there are no missing values.
             lat = latNode[:].transpose((1,2,0))
             lon = lonNode[:].transpose((1,2,0))            
@@ -1364,7 +1464,7 @@ class HDFnasaomiv3l2_File(HDFFile):
         # make sure filename is actually an input file
         if getLongName(filename) != HDFnasaomiv3l2_File.OMIAURANO2_FILE_NAME:
             raise IOError('Attempt to read non-NASA OMI L2 file as such.')
-        
+       
         # start by assuming we aren't going to find anything
         self.pixCorners = None
 
@@ -1396,7 +1496,7 @@ class HDFnasaomiv3l2_File(HDFFile):
                 allPossible = [os.path.join(cornerDir, f) for f in os.listdir(cornerDir)]
                 for f in allPossible:
                     try:
-                        if tables.isHDF5File(f) \
+                        if tables.is_hdf5_file(f) \
                                 and getLongName(f) == HDFnasaomil2_File.OMIAURANO2_CORNER_FILE_NAME \
                                 and getOrbitNumber(f) == forbitnumber:
                             self.pixCorners = f
@@ -1405,7 +1505,7 @@ class HDFnasaomiv3l2_File(HDFFile):
                         pass
                 
         if self.pixCorners == None:
-            print "No valid corner file found for {0}.".format(filename)              
+            print("No valid corner file found for {0}.".format(filename))              
     __dataPath = '/HDFEOS/SWATHS/ColumnAmountNO2/Data Fields/'
     __geoPath = '/HDFEOS/SWATHS/ColumnAmountNO2/Geolocation Fields/'
     
@@ -1458,6 +1558,10 @@ class HDFnasaomiv3l2_File(HDFFile):
                  'TerrainReflectivity' : __dataPath+'TerrainReflectivity',
                  'TerrainPressure' : __dataPath+'TerrainPressure',
                  'TerrainHeight' : __dataPath+'TerrainHeight' ,
+                 'TropopausePressure' : __dataPath+'TropopausePressure',
+                 'VcdApTrop' : __dataPath+'VcdApTrop',
+                 'SlantColumnAmountNO2' : __dataPath+'SlantColumnAmountNO2',
+                 'SlantColumnAmountNO2Destriped' : __dataPath+'SlantColumnAmountNO2Destriped',
                  'SmallPixelRadiancePointer' :__dataPath +'SmallPixelRadiancePointer',
                  'SmallPixelRadiance' : __dataPath+'SmallPixelRadiance',
                  'InstrumentConfigurationId' : __dataPath+'InstrumentConfigurationId',
@@ -1497,12 +1601,12 @@ class HDFnasaomiv3l2_File(HDFFile):
         latNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLatitude'
         lonNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLongitude'
         try:
-            pxFid = tables.openFile(self.pixCorners)
+            pxFid = tables.open_file(self.pixCorners)
         except AttributeError:
             raise IOError('Unable to open pixel corners file.  Need pixel corners file to use corners')
         try:
-            latNode = pxFid.getNode('/', latNodeName)
-            lonNode = pxFid.getNode('/', lonNodeName)
+            latNode = pxFid.get_node('/', latNodeName)
+            lonNode = pxFid.get_node('/', lonNodeName)
             # Note: it is assumed that there are no missing values.
             lat = latNode[:].transpose((1,2,0))
             lon = lonNode[:].transpose((1,2,0))            
@@ -1582,7 +1686,7 @@ class HDFnasaomiso2l2_File(HDFFile):
                 allPossible = [os.path.join(cornerDir, f) for f in os.listdir(cornerDir)]
                 for f in allPossible:
                     try:
-                        if tables.isHDF5File(f) \
+                        if tables.is_hdf_file(f) \
                                 and getLongName(f) == HDFnasaomiso2l2_File.OMIAURASO2_CORNER_FILE_NAME \
                                 and getOrbitNumber(f) == forbitnumber:
                             self.pixCorners = f
@@ -1591,7 +1695,7 @@ class HDFnasaomiso2l2_File(HDFFile):
                         pass
                 
         if self.pixCorners == None:
-            print "No valid corner file found for {0}.".format(filename)                        
+            print("No valid corner file found for {0}.".format(filename))                        
             
     __dataPath = '/HDFEOS/SWATHS/OMI Total Column Amount SO2/Data Fields/'
     __geoPath = '/HDFEOS/SWATHS/OMI Total Column Amount SO2/Geolocation Fields/'
@@ -1664,12 +1768,12 @@ class HDFnasaomiso2l2_File(HDFFile):
         latNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLatitude'
         lonNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLongitude'
         try:
-            pxFid = tables.openFile(self.pixCorners)
+            pxFid = tables.open_file(self.pixCorners)
         except AttributeError:
             raise IOError('Unable to open pixel corners file.  Need pixel corners file to use corners')
         try:
-            latNode = pxFid.getNode('/', latNodeName)
-            lonNode = pxFid.getNode('/', lonNodeName)
+            latNode = pxFid.get_node('/', latNodeName)
+            lonNode = pxFid.get_node('/', lonNodeName)
             # Note: it is assumed that there are no missing values.
             lat = latNode[:].transpose((1,2,0))
             lon = lonNode[:].transpose((1,2,0))            
@@ -1690,3 +1794,469 @@ class HDFnasaomiso2l2_File(HDFFile):
         (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
         return struct
 
+# Author: Eliot Kim
+# Start Date: 8-5-2020
+class NETCDFqa4ecvomihchol2_File(NETCDFFile):
+
+    __mainPath = "/PRODUCT/"
+    __dataPath = "/PRODUCT/SUPPORT_DATA/DETAILED_RESULTS/"
+    __geoPath = "/PRODUCT/SUPPORT_DATA/GEOLOCATIONS/"
+    __inputPath = "/PRODUCT/SUPPORT_DATA/INPUT_DATA/"
+
+    _nameExpMap = {"amf_clear":__dataPath + "amf_clear",
+                   "averaging_kernel_clear":__dataPath + "averaging_kernel_clear",
+                   "cloud_radiance_fraction_hcho":__dataPath + "cloud_radiance_fraction_hcho",
+                   "intensity_offset_a":__dataPath + "intensity_offset_a",
+                   "intensity_offset_a_uncertainty":__dataPath + "intensity_offset_a_uncertainty",
+                   "intensity_offset_b":__dataPath + "intensity_offset_b",
+                   "intensity_offset_b_uncertainty":__dataPath + "intensity_offset_b_uncertainty",
+                   "irradiance_calibration_offset":__dataPath + "irradiance_calibration_offset",
+                   "irradiance_calibration_stretch":__dataPath + "irradiance_calibration_stretch",
+                   "irradiance_calibration_wavelength":__dataPath + "irradiance_calibration_wavelength",
+                   "number_of_spectral_points_in_retrieval":__dataPath + "number_of_spectral_points_in_retrieval",
+                   "polynomial_coefficients":__dataPath + "polynomial_coefficients",
+                   "polynomial_coefficients_uncertainty":__dataPath + "polynomial_coefficients_uncertainty",
+                   "processing_quality_flags":__dataPath + "processing_quality_flags",
+                   "radiance_calibration_offset":__dataPath + "radiance_calibration_offset",
+                   "radiance_calibration_offset_uncertainty":__dataPath + "radiance_calibration_offset_uncertainty",
+                   "radiance_calibration_stretch":__dataPath + "radiance_calibration_stretch",
+                   "radiance_calibration_stretch_uncertainty":__dataPath + "radiance_calibration_stretch_uncertainty",
+                   "radiance_calibration_wavelength":__dataPath + "radiance_calibration_wavelength",
+                   "ring_coefficient":__dataPath + "ring_coefficient",
+                   "ring_coefficient_uncertainty":__dataPath + "ring_coefficient_uncertainty",
+                   "rms_fit":__dataPath + "rms_fit",
+                   "scd_bro":__dataPath + "scd_bro",
+                   "scd_bro_uncertainty":__dataPath + "scd_bro_uncertainty",
+                   "scd_no2":__dataPath + "scd_no2",
+                   "scd_no2_uncertainty":__dataPath + "scd_no2_uncertainty",
+                   "scd_o3_223":__dataPath + "scd_o3_223",
+                   "scd_o3_223_uncertainty":__dataPath + "scd_o3_223_uncertainty",
+                   "scd_o3_243":__dataPath + "scd_o3_243",
+                   "scd_o3_243_uncertainty":__dataPath + "scd_o3_243_uncertainty",
+                   "scd_o3_lambda":__dataPath + "scd_o3_lambda",
+                   "scd_o3_lambda_uncertainty":__dataPath + "scd_o3_lambda_uncertainty",
+                   "scd_o3_squared":__dataPath + "scd_o3_squared",
+                   "scd_o3_squared_uncertainty":__dataPath + "scd_o3_squared_uncertainty",
+                   "scd_o4":__dataPath + "scd_o4",
+                   "scd_o4_uncertainty":__dataPath + "scd_o4_uncertainty",
+                   "scd_resol":__dataPath + "scd_resol",
+                   "scd_resol_uncertainty":__dataPath + "scd_resol_uncertainty",
+                   "scd_hcho":__dataPath + "scd_hcho",
+                   "scd_hcho_uncertainty_random":__dataPath + "scd_hcho_uncertainty_random",
+                   "vcd_hcho_correction_uncertainty":__dataPath + "vcd_hcho_correction_uncertainty",
+                   "amf_albedo_uncertainty":__dataPath + "amf_albedo_uncertainty",
+                   "amf_cloud_fraction_uncertainty":__dataPath + "amf_cloud_fraction_uncertainty",
+                   "amf_cloud_pressure_uncertainty":__dataPath + "amf_cloud_pressure_uncertainty",
+                   "amf_a_priori_profile_uncertainty":__dataPath + "amf_a_priori_profile_uncertainty",
+                   "profile_height":__dataPath + "profile_height",
+                   "scd_hcho_corrected":__dataPath + "scd_hcho_corrected",
+                   "scd_hcho_correction":__dataPath + "scd_hcho_correction",
+                   "scd_hcho_uncertainty_systematic":__dataPath + "scd_hcho_uncertainty_systematic",
+                   "vcd_hcho_correction":__dataPath + "vcd_hcho_correction",
+                   "tm5_vcd_hcho_background":__dataPath + "tm5_vcd_hcho_background",
+                   "amf_uncertainty":__dataPath + "amf_uncertainty",
+                   "tropospheric_hcho_vertical_column_uncertainty_systematic_scdes":__dataPath + "tropospheric_hcho_vertical_column_uncertainty_systematic_scdes",
+                   "tropospheric_hcho_vertical_column_uncertainty_systematic_amfes":__dataPath + "tropospheric_hcho_vertical_column_uncertainty_systematic_amfes",
+                   "tropospheric_hcho_vertical_column_uncertainty_systematic_vcd0es":__dataPath + "tropospheric_hcho_vertical_column_uncertainty_systematic_vcd0es",
+                   "latitude_bounds":__geoPath + "latitude_bounds",
+                   "longitude_bounds":__geoPath + "longitude_bounds",
+                   "pixel_type":__geoPath + "pixel_type",
+                   "relative_azimuth_angle":__geoPath + "relative_azimuth_angle",
+                   "relative_azimuth_angle_sat":__geoPath + "relative_azimuth_angle_sat",
+                   "satellite_altitude":__geoPath + "satellite_altitude",
+                   "satellite_latitude":__geoPath + "satellite_latitude",
+                   "satellite_longitude":__geoPath + "satellite_longitude",
+                   "solar_zenith_angle":__geoPath + "solar_zenith_angle",
+                   "solar_zenith_angle_sat":__geoPath + "solar_zenith_angle_sat",
+                   "viewing_zenith_angle":__geoPath + "viewing_zenith_angle",
+                   "viewing_zenith_angle_sat":__geoPath + "viewing_zenith_angle_sat",
+                   "cloud_fraction":__inputPath + "cloud_fraction",
+                   "cloud_fraction_uncertainty":__inputPath + "cloud_fraction_uncertainty",
+                   "cloud_pressure":__inputPath + "cloud_pressure",
+                   "cloud_pressure_uncertainty":__inputPath + "cloud_pressure_uncertainty",
+                   "cloud_albedo":__inputPath + "cloud_albedo",
+                   "cloud_albedo_uncertainty":__inputPath + "cloud_albedo_uncertainty",
+                   "snow_ice_flag":__inputPath + "snow_ice_flag",
+                   "surface_albedo":__inputPath + "surface_albedo",
+                   "surface_albedo_hcho":__inputPath + "surface_albedo_hcho",
+                   "surface_altitude":__inputPath + "surface_altitude",
+                   "surface_altitude_uncertainty":__inputPath + "surface_altitude_uncertainty",
+                   "surface_classification":__inputPath + "surface_classification",
+                   "surface_pressure":__inputPath + "surface_pressure",
+                   "hcho_profile_apriori":__inputPath + "hcho_profile_apriori",
+                   "omi_xtrack_flags":__inputPath + "omi_xtrack_flags",
+                   "amf_trop":__mainPath + "amf_trop",
+                   "averaging_kernel":__mainPath + "averaging_kernel",
+                   "tm5_pressure_level_a":__mainPath + "tm5_pressure_level_a",
+                   "tm5_pressure_level_b":__mainPath + "tm5_pressure_level_b",
+                   "tm5_tropopause_layer_index":__mainPath + "tm5_tropopause_layer_index",
+                   "tm5_surface_pressure":__mainPath + "tm5_surface_pressure",
+                   "processing_error_flag":__mainPath + "processing_error_flag",
+                   "time_utc":__mainPath + "time_utc",
+                   "latitude":__mainPath + "latitude",
+                   "longitude":__mainPath + "longitude",
+                   "delta_time":__mainPath + "delta_time",
+                   "tropospheric_hcho_vertical_column":__mainPath + "tropospheric_hcho_vertical_column",
+                   "tropospheric_hcho_vertical_column_uncertainty_random":__mainPath + "tropospheric_hcho_vertical_column_uncertainty_random",
+                   "tropospheric_hcho_vertical_column_uncertainty_systematic":__mainPath + "tropospheric_hcho_vertical_column_uncertainty_systematic"}
+
+    # Some of the indexing may be incorrect --> needs testing
+    _indexMap = {"default":lambda var, ind: var[..., ind[0], ind[1]],
+                 "averaging_kernel":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "tm5_pressure_level_a":lambda var, ind: var[:],
+                 "tm5_pressure_level_b":lambda var, ind: var[:],
+                 "time_utc":lambda var, ind: var[:, ind[0]],
+                 "delta_time":lambda var, ind: var[ind[0]],
+                 "irradiance_calibration_offset":lambda var, ind: var[ind[0]],
+                 "irradiance_calibration_stretch":lambda var, ind: var[ind[0]],
+                 "irradiance_calibration_wavelength":lambda var, ind: var[ind[0]],
+                 "radiance_calibration_wavelength":lambda var, ind: var[ind[0]],
+                 "satellite_altitude":lambda var, ind: var[ind[0]],
+                 "satellite_latitude":lambda var, ind: var[ind[0]],
+                 "satellite_longitude":lambda var, ind: var[ind[0]]}
+
+    def get_geo_corners(self):
+
+        lat = self.get("latitude_bounds")
+        lon = self.get("longitude_bounds")
+
+        lat = numpy.squeeze(lat)
+        lon = numpy.squeeze(lon)
+
+        ind = numpy.indices(lat.shape[0:2]).transpose((1, 2, 0))
+
+        protoDtype = [('lat', lat.dtype, 4), ('lon', lon.dtype, 4), ('ind', ind.dtype, 2)]
+        struct = numpy.zeros(lat.shape[0:2], dtype=protoDtype)
+        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
+        return struct
+
+    def get_geo_centers(self):
+        lat = self.get("latitude")
+        lon = self.get("longitude")
+        ind = numpy.indices(lat.shape).transpose((1,2,0))
+        protoDtype = [('lat', lat.dtype), ('lon', lon.dtype), ('ind', ind.dtype, 2)]
+        struct = numpy.zeros(lat.shape,dtype=protoDtype)
+        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
+        return struct
+
+# Author: Eliot Kim
+# Start Date: 9/21/2020
+class NETCDFtropomino2l2_File(NETCDFFile):
+
+    __mainPath = "/PRODUCT/"
+    __geoPath = "/PRODUCT/SUPPORT_DATA/GEOLOCATIONS/"
+    __inputPath = "/PRODUCT/SUPPORT_DATA/INPUT_DATA/"
+    __dataPath = "/PRODUCT/SUPPORT_DATA/DETAILED_RESULTS/"
+
+    _nameExpMap = {"latitude":__mainPath + "latitude",
+                    "longitude":__mainPath + "longitude",
+                    "delta_time":__mainPath + "delta_time",
+                    "time_utc":__mainPath + "time_utc",
+                    "qa_value":__mainPath + "qa_value",
+                    "nitrogendioxide_tropospheric_column":__mainPath + "nitrogendioxide_tropospheric_column",
+                    "nitrogendioxide_tropospheric_column_precision":__mainPath + "nitrogendioxide_tropospheric_column_precision",
+                    "nitrogendioxide_tropospheric_column_precision_kernel":__mainPath + "nitrogendioxide_tropospheric_column_precision_kernel",
+                    "averaging_kernel":__mainPath + "averaging_kernel",
+                    "air_mass_factor_troposphere":__mainPath + "air_mass_factor_troposphere",
+                    "air_mass_factor_total":__mainPath + "air_mass_factor_total",
+                    "tm5_tropopause_layer_index":__mainPath + "tm5_tropopause_layer_index",
+                    "tm5_constant_a":__mainPath + "tm5_constant_a",
+                    "tm5_constant_b":__mainPath + "tm5_constant_b",
+                    "satellite_latitude":__geoPath + "satellite_latitude",
+                    "satellite_longitude":__geoPath + "satellite_longitude",
+                    "satellite_altitude":__geoPath + "satellite_altitude",
+                    "satellite_orbit_phase":__geoPath + "satellite_orbit_phase",
+                    "solar_zenith_angle":__geoPath + "solar_zenith_angle",
+                    "solar_azimuth_angle":__geoPath + "solar_azimuth_angle",
+                    "viewing_zenith_angle":__geoPath + "viewing_zenith_angle",
+                    "latitude_bounds":__geoPath + "latitude_bounds",
+                    "longitude_bounds":__geoPath + "longitude_bounds",
+                    "geolocation_flags":__geoPath + "geolocation_flags",
+                    "surface_altitude":__inputPath + "surface_altitude",
+                    "surface_altitude_precision":__inputPath + "surface_altitude_precision",
+                    "surface_classification":__inputPath + "surface_classification",
+                    "instrument_configuration_identifier":__inputPath + "instrument_configuration_identifier",
+                    "instrument_configuration_version":__inputPath + "instrument_configuration_version",
+                    "scaled_small_pixel_variance":__inputPath + "scaled_small_pixel_variance",
+                    "eastward_wind":__inputPath + "eastward_wind",
+                    "northward_wind":__inputPath + "northward_wind",
+                    "surface_pressure":__inputPath + "surface_pressure",
+                    "surface_albedo_nitrogendioxide_window":__inputPath + "surface_albedo_nitrogendioxide_window",
+                    "surface_albedo":__inputPath + "surface_albedo",
+                    "cloud_pressure_crb":__inputPath + "cloud_pressure_crb",
+                    "cloud_fraction_crb":__inputPath + "cloud_fraction_crb",
+                    "scene_albedo":__inputPath + "scene_albedo",
+                    "apparent_scene_pressure":__inputPath + "apparent_scene_pressure",
+                    "snow_ice_flag":__inputPath + "snow_ice_flag",
+                    "aerosol_index_354_388":__inputPath + "aerosol_index_354_388",
+                    "processing_quality_flags":__dataPath + "processing_quality_flags",
+                    "number_of_spectral_points_in_retrieval":__dataPath + "number_of_spectral_points_in_retrieval",
+                    "number_of_iterations":__dataPath + "number_of_iterations",
+                    "wavelength_calibration_offset":__dataPath + "wavelength_calibration_offset",
+                    "wavelength_calibration_offset_precision":__dataPath + "wavelength_calibration_offset_precision",
+                    "wavelength_calibration_stretch":__dataPath + "wavelength_calibration_stretch",
+                    "wavelength_calibration_stretch_precision":__dataPath + "wavelength_calibration_stretch_precision",
+                    "wavelength_calibration_chi_square":__dataPath + "wavelength_calibration_chi_square",
+                    "wavelength_calibration_irradiance_offset":__dataPath + "wavelength_calibration_irradiance_offset",
+                    "wavelength_calibration_irradince_offset_precision":__dataPath + "wavelength_calibration_irradince_offset_precision",
+                    "wavelength_calibration_irradiance_chi_square":__dataPath + "wavelength_calibration_irradiance_chi_square",
+                    "nitrogendioxide_stratospheric_column":__dataPath + "nitrogendioxide_stratospheric_column",
+                    "nitrogendioxide_stratospheric_column_precision":__dataPath + "nitrogendioxide_stratospheric_column_precision",
+                    "nitrogendioxide_total_column":__dataPath + "nitrogendioxide_total_column",
+                    "nitrogendioxide_total_column_precision":__dataPath + "nitrogendioxide_total_column_precision",
+                    "nitrogendioxide_total_column_precision_kernel":__dataPath + "nitrogendioxide_total_column_precision_kernel",
+                    "nitrogendioxide_summed_total_column":__dataPath + "nitrogendioxide_summed_total_column",
+                    "nitrogendioxide_summed_total_column_precision":__dataPath + "nitrogendioxide_summed_total_column_precision",
+                    "nitrogendioxide_slant_column_density":__dataPath + "nitrogendioxide_slant_column_density",
+                    "nitrogendioxide_slant_column_density_precision":__dataPath + "nitrogendioxide_slant_column_density_precision",
+                    "nitrogendioxide_slant_column_density_stripe_amplitude":__dataPath + "nitrogendioxide_slant_column_density_stripe_amplitude",
+                    "ozone_slant_column_density":__dataPath + "ozone_slant_column_density",
+                    "ozone_slant_column_density_precision":__dataPath + "ozone_slant_column_density_precision",
+                    "oxygen_oxygen_dimer_slant_column_density":__dataPath + "oxygen_oxygen_dimer_slant_column_density",
+                    "oxygen_oxygen_dimer_slant_column_density_precision":__dataPath + "oxygen_oxygen_dimer_slant_column_density_precision",
+                    "water_slant_column_density":__dataPath + "water_slant_column_density",
+                    "water_slant_column_density_precision":__dataPath + "water_slant_column_density_precision",
+                    "water_liquid_slant_column_density":__dataPath + "water_liquid_slant_column_density",
+                    "water_liquid_slant_column_density_precision":__dataPath + "water_liquid_slant_column_density_precision",
+                    "ring_coefficient":__dataPath + "ring_coefficient",
+                    "ring_coefficient_precision":__dataPath + "ring_coefficient_precision",
+                    "polynomial_coefficients":__dataPath + "polynomial_coefficients",
+                    "polynomial_coefficients_precision":__dataPath + "polynomial_coefficients_precision",
+                    "intensity_offset_coefficients":__dataPath + "intensity_offset_coefficients",
+                    "intensity_offset_coefficients_precision":__dataPath + "intensity_offset_coefficients_precision",
+                    "cloud_fraction_crb_nitrogendioxide_window":__dataPath + "cloud_fraction_crb_nitrogendioxide_window",
+                    "cloud_radiance_fraction_nitrogendioxide_window":__dataPath + "cloud_radiance_fraction_nitrogendioxide_window",
+                    "chi_square":__dataPath + "chi_square",
+                    "root_mean_square_error_of_fit":__dataPath + "root_mean_square_error_of_fit",
+                    "degrees_of_freedom":__dataPath + "degrees_of_freedom",
+                    "air_mass_factor_stratosphere":__dataPath + "air_mass_factor_stratosphere",
+                    "air_mass_factor_cloudy":__dataPath + "air_mass_factor_cloudy",
+                    "air_mass_factor_clear":__dataPath + "air_mass_factor_clear",
+                    "nitrogendioxide_ghost_column":__dataPath + "nitrogendioxide_ghost_column"}
+
+    _indexMap = {"default":lambda var, ind: var[..., ind[0], ind[1]],
+                 "delta_time":lambda var, ind: var[:, ind[0]],
+                 "time_utc":lambda var, ind: var[:, ind[0]],
+                 "averaging_kernel":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "tm5_constant_a":lambda var, ind: var[:],
+                 "tm5_constant_b":lambda var, ind: var[:],
+                 "satellite_latitude":lambda var, ind: var[:, ind[0]],
+                 "satellite_longitude":lambda var, ind: var[:, ind[0]],
+                 "satellite_altitude":lambda var, ind: var[:, ind[0]],
+                 "satellite_orbit_phase":lambda var, ind: var[:, ind[0]],
+                #  "latitude_bounds":lambda var, ind: 
+                #  "longitude_bounds":lambda var, ind:
+                 "instrument_configuration_identifier":lambda var, ind: var[:, ind[0]],
+                 "instrument_configuration_version":lambda var, ind: var[:, ind[0]],
+                 "wavelength_calibration_irradiance_offset":lambda var, ind: var[:, ind[1]],
+                 "wavelength_calibration_irradiance_offset_precision":lambda var, ind: var[:, ind[1]],
+                 "wavelength_calibration_irradiance_chi_square":lambda var, ind: var[:, ind[1]],
+                 "nitrogendioxide_slant_column_density_stripe_amplitude":lambda var, ind: var[:, ind[1]],
+                 "polynomial_coefficients":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "polynomial_coefficients_precision":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "intensity_offset_coefficients":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "intensity_offset_coefficients_precision":lambda var, ind: var[:, ind[0], ind[1], :]}
+
+    def get_geo_corners(self):
+
+        lat = self.get("latitude_bounds")
+        lon = self.get("longitude_bounds")
+
+        lat = numpy.squeeze(lat)
+        lon = numpy.squeeze(lon)
+
+        ind = numpy.indices(lat.shape[0:2]).transpose((1, 2, 0))
+
+        protoDtype = [('lat', lat.dtype, 4), ('lon', lon.dtype, 4), ('ind', ind.dtype, 2)]
+        struct = numpy.zeros(lat.shape[0:2], dtype=protoDtype)
+        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
+        return struct
+
+    def get_geo_centers(self):
+        lat = self.get("latitude")
+        lon = self.get("longitude")
+        ind = numpy.indices(lat.shape).transpose((1,2,0))
+        protoDtype = [('lat', lat.dtype), ('lon', lon.dtype), ('ind', ind.dtype, 2)]
+        struct = numpy.zeros(lat.shape,dtype=protoDtype)
+        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
+        return struct
+
+# Author: Eliot Kim
+# Start Date: 10/18/2020
+class NETCDFtropomiso2l2_File(NETCDFFile):
+
+    __mainPath = "/PRODUCT/"
+    __geoPath = "/PRODUCT/SUPPORT_DATA/GEOLOCATIONS/"
+    __inputPath = "/PRODUCT/SUPPORT_DATA/INPUT_DATA/"
+    __dataPath = "/PRODUCT/SUPPORT_DATA/DETAILED_RESULTS/"
+
+    _nameExpMap = {'scanline': __mainPath,
+                    'ground_pixel': __mainPath,
+                    'time': __mainPath,
+                    'corner': __mainPath,
+                    'latitude': __mainPath,
+                    'longitude': __mainPath,
+                    'delta_time': __mainPath,
+                    'time_utc': __mainPath,
+                    'qa_value': __mainPath,
+                    'sulfurdioxide_total_vertical_column': __mainPath,
+                    'sulfurdioxide_total_vertical_column_precision': __mainPath,
+                    'layer': __mainPath,
+                    'satellite_latitude': __geoPath,
+                    'satellite_longitude': __geoPath,
+                    'satellite_altitude': __geoPath,
+                    'satellite_orbit_phase': __geoPath,
+                    'solar_zenith_angle': __geoPath,
+                    'solar_azimuth_angle': __geoPath,
+                    'viewing_zenith_angle': __geoPath,
+                    'viewing_azimuth_angle': __geoPath,
+                    'latitude_bounds': __geoPath,
+                    'longitude_bounds': __geoPath,
+                    'geolocation_flags': __geoPath,
+                    'snow_ice_flag_nise': __inputPath,
+                    'snow_ice_flag': __inputPath,
+                    'cloud_fraction_crb': __inputPath,
+                    'cloud_fraction_crb_precision': __inputPath,
+                    'cloud_pressure_crb': __inputPath,
+                    'cloud_pressure_crb_precision': __inputPath,
+                    'cloud_height_crb': __inputPath,
+                    'cloud_height_crb_precision': __inputPath,
+                    'cloud_albedo_crb': __inputPath,
+                    'cloud_albedo_crb_precision': __inputPath,
+                    'ozone_total_vertical_column': __inputPath,
+                    'ozone_total_vertical_column_precision': __inputPath,
+                    'surface_altitude': __inputPath,
+                    'surface_altitude_precision': __inputPath,
+                    'surface_classification': __inputPath,
+                    'instrument_configuration_identifier': __inputPath,
+                    'instrument_configuration_version': __inputPath,
+                    'scaled_small_pixel_variance': __inputPath,
+                    'surface_pressure': __inputPath,
+                    'tm5_constant_a': __inputPath, # Just 1 column of TM5 Pressure Level values instead of 2 as in QA4ECV and TROPOMI NO2.
+                    'tm5_constant_b': __inputPath,
+                    'aerosol_index_340_380': __inputPath,
+                    'surface_albedo_328nm': __inputPath,
+                    'surface_albedo_376nm': __inputPath,
+                    'sulfurdioxide_total_vertical_column_trueness': __dataPath,
+                    'fitted_slant_columns_win1': __dataPath,
+                    'fitted_slant_columns_win1_precision': __dataPath,
+                    'fitted_slant_columns_win2': __dataPath,
+                    'fitted_slant_columns_win2_precision': __dataPath,
+                    'fitted_slant_columns_win3': __dataPath,
+                    'fitted_slant_columns_win3_precision': __dataPath,
+                    'selected_fitting_window_flag': __dataPath,
+                    'sulfurdioxide_slant_column_corrected': __dataPath,
+                    'sulfurdioxide_slant_column_corrected_trueness': __dataPath,
+                    'sulfurdioxide_slant_column_corrected_win1': __dataPath,
+                    'sulfurdioxide_slant_column_corrected_win2': __dataPath,
+                    'sulfurdioxide_slant_column_corrected_win3': __dataPath,
+                    'fitted_root_mean_square_win1': __dataPath,
+                    'fitted_root_mean_square_win2': __dataPath,
+                    'fitted_root_mean_square_win3': __dataPath,
+                    'averaging_kernel': __dataPath,
+                    'sulfurdioxide_profile_apriori': __dataPath,
+                    'fitted_radiance_shift': __dataPath,
+                    'fitted_radiance_squeeze': __dataPath,
+                    'fitted_radiance_shift_win1': __dataPath,
+                    'fitted_radiance_squeeze_win1': __dataPath,
+                    'number_of_spectral_points_in_retrieval_win1': __dataPath,
+                    'fitted_radiance_shift_win2': __dataPath,
+                    'fitted_radiance_squeeze_win2': __dataPath,
+                    'number_of_spectral_points_in_retrieval_win2': __dataPath,
+                    'fitted_radiance_shift_win3': __dataPath,
+                    'fitted_radiance_squeeze_win3': __dataPath,
+                    'number_of_spectral_points_in_retrieval_win3': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_polluted': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_polluted_precision': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_polluted_trueness': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_polluted_kernel_trueness': __dataPath,
+                    'sulfurdioxide_clear_air_mass_factor_polluted': __dataPath,
+                    'sulfurdioxide_cloudy_air_mass_factor_polluted': __dataPath,
+                    'sulfurdioxide_total_vertical_column_1km': __dataPath,
+                    'sulfurdioxide_total_vertical_column_1km_precision': __dataPath,
+                    'sulfurdioxide_total_vertical_column_1km_trueness': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_1km': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_1km_precision': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_1km_trueness': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_1km_kernel_trueness': __dataPath,
+                    'sulfurdioxide_clear_air_mass_factor_1km': __dataPath,
+                    'sulfurdioxide_cloudy_air_mass_factor_1km': __dataPath,
+                    'sulfurdioxide_averaging_kernel_scaling_box_1km': __dataPath,
+                    'sulfurdioxide_total_vertical_column_7km': __dataPath,
+                    'sulfurdioxide_total_vertical_column_7km_precision': __dataPath,
+                    'sulfurdioxide_total_vertical_column_7km_trueness': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_7km': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_7km_precision': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_7km_trueness': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_7km_kernel_trueness': __dataPath,
+                    'sulfurdioxide_clear_air_mass_factor_7km': __dataPath,
+                    'sulfurdioxide_cloudy_air_mass_factor_7km': __dataPath,
+                    'sulfurdioxide_averaging_kernel_scaling_box_7km': __dataPath,
+                    'sulfurdioxide_total_vertical_column_15km': __dataPath,
+                    'sulfurdioxide_total_vertical_column_15km_precision': __dataPath,
+                    'sulfurdioxide_total_vertical_column_15km_trueness': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_15km': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_15km_precision': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_15km_trueness': __dataPath,
+                    'sulfurdioxide_total_air_mass_factor_15km_kernel_trueness': __dataPath,
+                    'sulfurdioxide_clear_air_mass_factor_15km': __dataPath,
+                    'sulfurdioxide_cloudy_air_mass_factor_15km': __dataPath,
+                    'sulfurdioxide_averaging_kernel_scaling_box_15km': __dataPath,
+                    'sulfurdioxide_slant_column_correction_flag': __dataPath,
+                    'sulfurdioxide_detection_flag': __dataPath,
+                    'number_of_iterations_in_retrieval': __dataPath,
+                    'number_of_iterations_in_retrieval_win1': __dataPath,
+                    'number_of_iterations_in_retrieval_win2': __dataPath,
+                    'number_of_iterations_in_retrieval_win3': __dataPath,
+                    'fitted_root_mean_square': __dataPath,
+                    'cloud_fraction_intensity_weighted': __dataPath,
+                    'cloud_fraction_intensity_weighted_precision': __dataPath,
+                    'processing_quality_flags': __dataPath,
+                    'number_of_spectral_points_in_retrieval': __dataPath,
+                    'number_of_slant_columns_win1': __dataPath,
+                    'number_of_slant_columns_win2': __dataPath,
+                    'number_of_slant_columns_win3': __dataPath}
+
+    _indexMap = {"default":lambda var, ind: var[..., ind[0], ind[1]],
+                 "time_utc":lambda var, ind: var[:, ind[0]],
+                 "satellite_latitude":lambda var, ind: var[:, ind[0]],
+                 "satellite_longitude":lambda var, ind: var[:, ind[0]],
+                 "satellite_altitude":lambda var, ind: var[:, ind[0]],
+                 "satellite_orbit_phase":lambda var, ind: var[:, ind[0]],
+                 "instrument_configuration_identifier":lambda var, ind: var[:, ind[0]],
+                 "instrument_configuration_version":lambda var, ind: var[:, ind[0]],
+                 "tm5_constant_a":lambda var, ind: var[:],
+                 "tm5_constant_b":lambda var, ind: var[:],
+                 "fitted_slant_columns_win1":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "fitted_slant_columns_win1_precision":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "fitted_slant_columns_win2":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "fitted_slant_columns_win2_precision":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "fitted_slant_columns_win3":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "fitted_slant_columns_win3_precision":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "averaging_kernel":lambda var, ind: var[:, ind[0], ind[1], :],
+                 "sulfurdioxide_profile_apriori":lambda var, ind: var[:, ind[0], ind[1], :]}
+
+    def get_geo_corners(self):
+
+        lat = self.get("latitude_bounds")
+        lon = self.get("longitude_bounds")
+
+        lat = numpy.squeeze(lat)
+        lon = numpy.squeeze(lon)
+
+        ind = numpy.indices(lat.shape[0:2]).transpose((1, 2, 0))
+
+        protoDtype = [('lat', lat.dtype, 4), ('lon', lon.dtype, 4), ('ind', ind.dtype, 2)]
+        struct = numpy.zeros(lat.shape[0:2], dtype=protoDtype)
+        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
+        return struct
+
+    def get_geo_centers(self):
+        lat = self.get("latitude")
+        lon = self.get("longitude")
+        ind = numpy.indices(lat.shape).transpose((1,2,0))
+        protoDtype = [('lat', lat.dtype), ('lon', lon.dtype), ('ind', ind.dtype, 2)]
+        struct = numpy.zeros(lat.shape,dtype=protoDtype)
+        (struct['lat'], struct['lon'], struct['ind']) = (lat, lon, ind)
+        return struct
+                                     

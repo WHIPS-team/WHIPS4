@@ -53,6 +53,7 @@ Functions implemented for each class:
 import sys
 
 from pyproj import Proj
+from builtins import object
 
 def ValidProjections():
     '''Return a list of valid projection names'''
@@ -60,7 +61,7 @@ def ValidProjections():
     names = dir(currentModule)
     return [el[:-8] for el in names if el.endswith("_GridDef")]
     
-class GridDef:
+class GridDef(object):
     '''Abstract class to handle projection/gridding of data'''
     def __init__(self, parms):
         pass
@@ -120,7 +121,7 @@ class latlon_GridDef(GridDef):
         castDict = {"xOrig":float, "yOrig":float,
                     "xCell":float, "yCell":float,
                     "nRows":int, "nCols":int}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             parmDict[k] = func(parmDict[k])
         self.parms = parmDict
     def indLims(self):
@@ -200,7 +201,7 @@ class lcc2par_GridDef(GridDef):
                     "xOrig" : float, "yOrig" : float,
                     "xCell" : float, "yCell" : float,
                     "nRows" : int, "nCols" : int}
-        for (k,func) in castDict.items():
+        for (k,func) in list(castDict.items()):
             parms[k] = func(parms[k])
         self.parms = parms
 
