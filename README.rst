@@ -39,8 +39,8 @@ in the WHIPS user guide.
 2. Download whatever data you plan to process.  Currently, the program
 is designed to process OMI NO2 DOMINO level 2 data, OMI NO2 NASA level
 2 data, MOPITT CO data, NASA MODIS AOD level 2 data, OMI SO2 level 2 data,
-TROPOMI NO2 level 2 data, and TROPOMI SO2 level 2 data.  See the 
-detailed documentation for the --filelist argument for locations of data.
+OMI HCHO level 2 data, TROPOMI NO2 level 2 data, and TROPOMI SO2 level 2 data.  
+See the detailed documentation for the --filelist argument for locations of data.
 
 
 3. Navigate to the folder where whips.py is located (or add it to
