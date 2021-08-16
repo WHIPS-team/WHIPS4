@@ -6,8 +6,8 @@ Wisconsin Horizontal Interpolation Program for Satellites provides custom griddi
 PROJECT TITLE: WHIPS
 PURPOSE OF PROJECT: Provide a well-documented, easy-to-use general-purpose
                     processing module for processing satellite data
-VERSION: 3.1.1 (4/21/19)
-AUTHORS: Tracey Holloway, Jacob Oberman, Peidong Wang
+VERSION: 4.0 (8/16/21)
+AUTHORS: Tracey Holloway, Jacob Oberman, Peidong Wang, Eliot Kim
 CONTACT: taholloway@wisc.edu
 
 
@@ -20,9 +20,10 @@ equivalent:
     We wish to thank the University of Wisconsin-Madison for the 
     use and development of the Wisconsin Horizontal Interpolation
     Program for Satellites (WHIPS).  WHIPS was developed by Tracey 
-    Holloway, Jacob Oberman and Peidon Wang, with funding from the 
-    NASA Air Quality Applied Science Team (AQAST) and the NASA Health 
-    and Air Quality Applied Sciences Team (HAQAST).
+    Holloway, Jacob Oberman, Peidong Wang, and Eliot Kim, with funding  
+    from the NASA Air Quality Applied Science Team (AQAST), the NASA  
+    Health and Air Quality Applied Sciences Team (HAQAST), and the 
+    The State of Texas Air Quality Research Program (AQRP).
 
 
 QUICK START
@@ -32,12 +33,15 @@ QUICK START
 1. Install the program and run the built-in test module to confirm
 that it is working properly.  Installation instructions can be found
 in the file user_guides/WHIPS_User_Guide_V3.pdf
- 
+***note: WHIPS User Guide for Version 4 is in progress*** 
+***the V3 user guide does not include guidance for TROPOMI products***
+***please see tropomi_runexample.py for TROPOMI data use*** 
 
 2. Download whatever data you plan to process.  Currently, the program
 is designed to process OMI NO2 DOMINO level 2 data, OMI NO2 NASA level
-2 data, MOPITT CO data, MODIS AOD level 2 data, and OMI SO2 NSAA level 2 data.  See the --filelist
-argument documentation for more on aquiring data.
+2 data, MOPITT CO data, MODIS AOD level 2 data, OMI SO2 NSAA level 2 data, 
+TROPOMI NO2 level 2 data, and TROPOMI SO2 level 2 data.  
+See the --filelist argument documentation for more on aquiring data.
 
 
 3. Navigate to the folder where whips.py installed or add it to
